@@ -92,7 +92,8 @@ def fuel_prediction(df, acft_dict, min_conf_ind=__DEFAULT_MIN_CONF_IND, cols_fue
         df.loc[:, col_true_air_spd_kt] = df[col_grnd_spd_kt]
 
     for col in [col_alti_std_ft, col_grnd_spd_kt, col_true_air_spd_kt]:
-        df.loc[:, __DERIV + __SEP + col] = (df[col] - df[col].shift(1)).fillna(method=__BFILL) / __4SEC
+        df.loc[:, __DERIV + __SEP + col] = (df[col] - df[col].shift(1)).\
+                                               fillna(method=__BFILL) / df[col_time_last_plot]
 
     if acft_type in acft_dict.keys():
         params = acft_dict[acft_type]
