@@ -32,7 +32,7 @@ conda install matplotlib jupyter jinja2==3.0.3
 Clone repository :
 
 ```sh
-git clone https://gitlab.asap.dsna.fr/dsna/me/acropole.git
+git clone https://github.com/DGAC/Acropole.git
 ```
 
 Finally, install lib :
