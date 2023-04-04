@@ -1,7 +1,5 @@
 # @internal
-#  Created on 19 January 2021
 #  @author: Gabriel JARRY
-#  This module enables the prediction of on-board parameters using machine learning models
 # @endinternal
 
 
@@ -9,7 +7,7 @@ from pkg_resources import resource_filename
 
 import tensorflow as tf
 from .utils import *
-from .variables import FUEL_GENERIC_MIN, FUEL_GENERIC_MAX, __MODEL_ACRPL
+from .variables import FUEL_GENERIC_MIN, FUEL_GENERIC_MAX, MODEL_ACRPL
 
 
 def load_generic_model(name):
@@ -33,7 +31,7 @@ def predict_fuel_generic(model_input_values):
     :param model_input_values: is the array of inputs:
     :return: List of predicted generic fuel flow
     """
-    model = model_cache(__MODEL_ACRPL)
+    model = model_cache(MODEL_ACRPL)
     model_input_values = (model_input_values - FUEL_GENERIC_MIN) / (FUEL_GENERIC_MAX - FUEL_GENERIC_MIN)
     data = tf.constant(model_input_values, dtype=tf.float32)
     tensorflow_result_dict = model.signatures[tf.saved_model.DEFAULT_SERVING_SIGNATURE_DEF_KEY](data)
