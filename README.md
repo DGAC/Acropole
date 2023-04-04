@@ -1,4 +1,4 @@
-# Acropole <img src="https://github.com/DGAC/Acropole/blob/main/logo.png" width="50">
+# Acropole <img src="https://github.com/DGAC/Acropole/blob/main/logo.png" width="30">
 
 This repository contains the Acropole model for aircraft fuel flow prediction and Python packages for aircraft trajectory processing and fuel flow enhancement.
 
