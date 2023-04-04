@@ -1,4 +1,4 @@
-# Acropole ![logo](https://gitlab.asap.dsna.fr/dsna/me/acropole/-/blob/main/logo.png)
+# Acropole ![logo](https://github.com/DGAC/Acropole/blob/main/logo.png)
 
 
 This repository contains the Acropole model for aircraft fuel flow prediction and Python packages for aircraft trajectory processing and fuel flow enhancement.
@@ -51,7 +51,7 @@ trajectory: that contains trajectory processes and pipelines
 ## Data and models
 ### Available data
 
-Aircraft parameters from open data to feed the model are available in https://gitlab.asap.dsna.fr/dsna/me/acropole/-/blob/main/acropole/data/acft_params.csv and loaded by the packages
+Aircraft parameters from open data to feed the model are available in https://github.com/DGAC/Acropole/blob/main/acropole/data/acft_params.csv and loaded by the packages
 
 ### Model training and evaluation
 
@@ -81,6 +81,6 @@ E-190 - 36287 trajectories
 
 ## Example of use
 
-For example of use please refer to https://gitlab.asap.dsna.fr/dsna/me/acropole/-/blob/main/examples/examples.ipynb
+For example of use please refer to https://github.com/DGAC/Acropole/blob/main/examples/examples.ipynb
 
 
