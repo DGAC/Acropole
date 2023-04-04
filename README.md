@@ -20,7 +20,7 @@ conda activate acropole
 Install dependencies :
 
 ```sh
-conda install tensorflow scipy joblib scikit-learn pandas  
+conda install numpy tensorflow scipy joblib scikit-learn pandas  
 ```
 
 If you want to add Jupyter notebooks and matplotlib :

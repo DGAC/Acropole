@@ -124,6 +124,7 @@ def fuel_prediction(df, acft_dict, min_conf_ind=__DEFAULT_MIN_CONF_IND, cols_fue
         df.loc[:,  col_estim_conso_kg] = None
     return df
 
+
 def load_generic_acft_dict(name):
     """
     Function that loads the aircracft parameters dict
@@ -133,7 +134,7 @@ def load_generic_acft_dict(name):
         path = resource_filename('acropole', name)
     except FileNotFoundError:
         path = name
-    acft_df = pd.read_csv(path,sep=";")
+    acft_df = pd.read_csv(path, sep=";")
     acft_dict = {row[__COL_ACFT_ICAO_TYPE]: row for key, row in acft_df.iterrows()}
     return acft_dict
 
