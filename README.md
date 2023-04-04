@@ -20,7 +20,13 @@ conda activate acropole
 Install dependencies :
 
 ```sh
-conda install tensorflow scipy joblib scikit-learn pandas matplotlib jupyter jinja2==3.0.3 
+conda install tensorflow scipy joblib scikit-learn pandas  
+```
+
+If you want to add Jupyter notebooks and matplotlib :
+
+```sh
+conda install matplotlib jupyter jinja2==3.0.3 
 ```
 
 Clone repository :
@@ -39,7 +45,7 @@ pip install .
 
 ## Python packages
 
-The Acropole Python library includes the following packages:
+The Acropole Python library includes the following packages :
 
 - variable: that contains variables and default constants
 
@@ -47,18 +53,18 @@ The Acropole Python library includes the following packages:
 
 - utils: that contains shared functions
 
-- predictor: that contains functions to load and apply Acropole models
+- predictor: that contains functions to load and apply Acropole model
 
 - trajectory: that contains trajectory processes and pipelines
 
 ## Data and models
 ### Available data
 
-Aircraft parameters from open data to feed the model are available in https://github.com/DGAC/Acropole/blob/main/acropole/data/acft_params.csv and loaded by the packages
+Aircraft parameters from open data to feed the model are available in https://github.com/DGAC/Acropole/blob/main/acropole/data/acft_params.csv and loaded by the packages.
 
 ### Model training and evaluation
 
-The Acropole model is a neural network built using Quick Acess Record (QAR) data over several aircraft types. Evaluation of the model is available in https://github.com/DGAC/Acropole/tree/main/evaluation/Dense_Acropole_FuelFlow_Scaling.
+The Acropole model is a neural network built using data from Quick Access Recorder (QAR) from several aircraft types. Evaluation of the model is available in https://github.com/DGAC/Acropole/tree/main/evaluation/Dense_Acropole_FuelFlow_Scaling.
 
 Data set is composed of :
 
