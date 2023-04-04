@@ -35,7 +35,7 @@ class PredictorTests(unittest.TestCase):
         models_mock = MagicMock()
         load_model_mock.side_effect = models_mock
 
-        self.predictor.load_generic_model()
+        self.predictor.load_generic_model("models/Dense_Acropole_FuelFlow_Scaling")
         self.assertEqual(ressource_filename_mock.call_count, 1)
         self.assertEqual(load_model_mock.call_count, 1)
         args, kwargs = ressource_filename_mock.call_args_list[0]
