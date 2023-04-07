@@ -2,7 +2,8 @@
 #  @author: Gabriel JARRY
 # @endinternal
 
-from .variables import DERIV, SEP
+DERIV = "DERIV"
+SEP = "SEP"
 
 COL_SYST_TRAJ_ID = "SYST_TRAJ_ID"
 COL_SYST_POINT_ID = "SYST_POINT_ID"
