@@ -32,10 +32,24 @@ class TrajectoryTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        sys.modules['tensorflow'] = Mock()
-        sys.modules['joblib'] = Mock()
-        cls.mock_scipy = Mock()
-        sys.modules['scipy'] = cls.mock_scipy
+        mock_scipy = Mock
+        mock_interpolate = Mock()
+        mock_interp1d = Mock()
+        mock_interpolate.interp1d = mock_interp1d
+        mock_scipy.interpolate = mock_interpolate
+
+        mock_latitude = Mock()
+        mock_latitude.side_effect = [[22, 23, 24]]
+        mock_interp1d.side_effect = [mock_latitude]
+
+        mock_predictor = Mock()
+
+
+        mock_utils = Mock
+        mock_utils.moving_average = Mock()
+
+        cls.trajectory = import_module("acropole.trajectory").Trajectory(mock_scipy=mock_scipy,
+                                                                         mock_predictor=mock_predictor)
 
         values = [["LFMN", "6/27/2020 3:51:30 AM +00:00", 30],
                   ["LFMN", "6/27/2020 3:51:24 AM +00:00", 24],
@@ -55,15 +69,7 @@ class TrajectoryTests(unittest.TestCase):
         cls.test_smooth_df = pd.DataFrame(values, columns=[cls.__COL_PLOT_DATE, cls.__COL_LATITUDE])
 
     def test_trajectory_resample(self):
-        mock_interpolate = Mock()
-        self.mock_scipy.interpolate = mock_interpolate
-        mock_interp1d = Mock()
-        mock_interpolate.interp1d = mock_interp1d
-        mock_latitude = Mock()
-        mock_latitude.side_effect = [[22, 23, 24]]
-        mock_interp1d.side_effect = [mock_latitude]
-
-        resampled_df = import_module("acropole.trajectory").resample(self.test_resample_df, self.__COLS_KEEP,
+        resampled_df = self.trajectory.resample(self.test_resample_df, self.__COLS_KEEP,
                                                                      self.__COLS_RESAMPLE, self.__COLS_PROCESS)
 
         ids = resampled_df[self.__COL_SYST_POINT_ID].values.tolist()
@@ -84,7 +90,7 @@ class TrajectoryTests(unittest.TestCase):
         self.assertListEqual(latitude, expected_latitude)
 
     def test_trajectory_smooth(self):
-        smoothed_df = import_module("acropole.trajectory").smooth(self.test_smooth_df,
+        smoothed_df = self.trajectory.smooth(self.test_smooth_df,
                                                                   cols_smooth=self.__COLS_RESAMPLE, window_width=4)
 
         smoothed_latitude = smoothed_df[self.__COL_LATITUDE].values.tolist()
