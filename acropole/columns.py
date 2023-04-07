@@ -1,6 +1,7 @@
 # @internal
 #  @author: Gabriel JARRY
 # @endinternal
+
 from .variables import DERIV, SEP
 
 COL_SYST_TRAJ_ID = "SYST_TRAJ_ID"
