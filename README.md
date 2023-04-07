@@ -47,8 +47,6 @@ pip install .
 
 The Acropole Python library includes the following packages :
 
-- variable: that contains variables and default constants
-
 - columns: that contains default data column names and list of columns
 
 - utils: that contains shared functions
