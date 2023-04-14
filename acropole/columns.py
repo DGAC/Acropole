@@ -3,7 +3,7 @@
 # @endinternal
 
 DERIV = "DERIV"
-SEP = "SEP"
+SEP = "_"
 
 COL_SYST_TRAJ_ID = "SYST_TRAJ_ID"
 COL_SYST_POINT_ID = "SYST_POINT_ID"
