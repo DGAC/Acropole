@@ -1,6 +1,4 @@
 #  @internal
-#  Created on 15 Mars 2021
-#
 #  @author: Gabriel JARRY
 #  @endinternal
 
