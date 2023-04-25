@@ -12,7 +12,7 @@ import importlib
 
 class Trajectory:
     """
-    Class to use remaining distance models
+    Class that contains data pipelines for trajectory enhancement
     """
 
     __4SEC = 4  # s
