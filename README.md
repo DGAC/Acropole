@@ -69,4 +69,21 @@ The Acropole model is a neural network built using data from Quick Access Record
 
 For example of use please refer to https://github.com/DGAC/Acropole/blob/main/examples/examples.ipynb
 
+## Credits
+
+
+  ```bibtex
+  @misc{jarry_towards_2024,
+	title = {Towards aircraft generic {Quick} {Access} {Recorder} fuel flow regression models for {ADS}-{B} data},
+	author = {Jarry, Gabriel and Delahaye, Daniel and Hurter, Christophe},
+	month = apr,
+	year = {2024},
+	doi = {10.13140/RG.2.2.23229.27360},
+}
+  
+  ```
+
+
+
+
 
