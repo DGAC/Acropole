@@ -8,7 +8,7 @@ This repository contains the Acropole model for aircraft fuel flow prediction an
 To easy install, creating dedicated anaconda environment is recommended :
 
 ```sh
-conda create -n acropole python=3.8 -c conda-forge
+conda create -n acropole python=3.11 -c conda-forge
 ```
 
 Activate conda environment :
@@ -26,7 +26,7 @@ conda install numpy tensorflow scipy joblib scikit-learn pandas
 If you want to add Jupyter notebooks and matplotlib :
 
 ```sh
-conda install matplotlib jupyter jinja2==3.0.3 
+conda install matplotlib jupyterlab
 ```
 
 Clone repository :
