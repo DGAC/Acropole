@@ -36,15 +36,15 @@ from acropole import FuelEstimator
 fe = FuelEstimator()
 
 flight = pd.DataFrame({
-	"timestamp": [0.0, 1.0, 2.0, 3.0],
-	"typecode": ["A320", "A320", "A320", "A320"],
-	"groundspeed": [400, 410, 420, 430],
-	"altitude": [10000, 11000, 12000, 13000],
-	"vertical_rate": [2000, 1500, 1000, 500],
+    "timestamp": [0.0, 1.0, 2.0, 3.0],
+    "typecode": ["A320", "A320", "A320", "A320"],
+    "groundspeed": [400, 410, 420, 430],
+    "altitude": [10000, 11000, 12000, 13000],
+    "vertical_rate": [2000, 1500, 1000, 500],
 
-	# airspeed and mass are optional
-	# "airspeed": [400, 410, 420, 430],
-	# "mass": [60000, 60000, 60000, 60000]
+    # airspeed and mass are optional
+    # "airspeed": [400, 410, 420, 430],
+    # "mass": [60000, 60000, 60000, 60000]
 })
 
 flight_fuel = fe.estimate(flight)
@@ -60,8 +60,8 @@ You can specify your own data and model file with the following initialization o
 
 ```python
 fe = FuelEstimator(
-	aircraft_params_path="path/to/your/data.csv",
-	model_path="path/to/your/model.kears",
+    aircraft_params_path="path/to/your/data.csv",
+    model_path="path/to/your/model.kears",
 )
 ```
 
@@ -73,11 +73,11 @@ The Acropole model is a neural network built using data from Quick Access Record
 
 ```bibtex
 @misc{jarry_towards_2024,
-	title = {Towards aircraft generic {Quick} {Access} {Recorder} fuel flow regression models for {ADS}-{B} data},
-	author = {Jarry, Gabriel and Delahaye, Daniel and Hurter, Christophe},
-	month = apr,
-	year = {2024},
-	doi = {10.13140/RG.2.2.23229.27360},
+    title = {Towards aircraft generic {Quick} {Access} {Recorder} fuel flow regression models for {ADS}-{B} data},
+    author = {Jarry, Gabriel and Delahaye, Daniel and Hurter, Christophe},
+    month = apr,
+    year = {2024},
+    doi = {10.13140/RG.2.2.23229.27360},
 }
 
 ```
