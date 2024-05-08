@@ -43,24 +43,27 @@ class FuelEstimator:
         """
         Estimates fuel flow and consumption based on the flight trajectory.
 
-        Args:
-            flight (pd.DataFrame): The flight data as a pandas DataFrame.
-            **kwargs: Additional keyword arguments for customization.
+        The minimum set of features are:
+            - flight (pd.DataFrame): The flight data as a pandas DataFrame.
+            - typecode (str): The column name for the aircraft type code.
+                Default is "typecode".
+            - timestamp (str): The column name for the timestamp (in second).
+                Default is "timestamp".
+            - groundspeed (str): The column name for the groundspeed (in knot).
+                Default is "groundspeed".
+            - altitude (str): The column name for the altitude (in feet).
+                Default is "altitude".
+            - vertical_rate (str): The column name for the vertical rate (in feet/minutes).
+                Default is "vertical_rate".
 
-        Keyword Args:
-            typecode (str): The column name for the aircraft type code. Default is "typecode".
-            timestamp (str): The column name for the timestamp. Default is "timestamp".
-            groundspeed (str): The column name for the groundspeed. Default is "groundspeed".
-            altitude (str): The column name for the altitude. Default is "altitude".
-            vertical_rate (str): The column name for the vertical rate. Default is "vertical_rate".
-            airspeed (str): The column name for the airspeed. Default is "airspeed".
-            mass (str): The column name for the mass. Default is "mass".
+        Optional arguments are:
+            - airspeed (str): The column name for the airspeed (in knot).
+                Default is "airspeed".
+            - mass (str): The column name for the mass (in kilogram).
+                Default is "mass".
 
         Returns:
             pd.DataFrame: The flight data with additional estimated fuel parameters.
-
-        Raises:
-            AssertionError: If the 'timestamp' column is not of type float.
 
         Warnings:
             If the aircraft type code is not supported.
@@ -96,9 +99,15 @@ class FuelEstimator:
         col_airspeed = kwargs.get("airspeed", "airspeed")
         col_mass = kwargs.get("mass", "mass")
 
+        assert col_typecode in flight.columns, f"Column {col_typecode} not found"
+        assert col_timestamp in flight.columns, f"Column {col_timestamp} not found"
+        assert col_groundspeed in flight.columns, f"Column {col_groundspeed} not found"
+        assert col_altitude in flight.columns, f"Column {col_altitude} not found"
         assert (
-            flight[col_timestamp].dtype == float
-        ), "'timestamp' must be a series of float"
+            col_vertical_rate in flight.columns
+        ), f"Column {col_vertical_rate} not found"
+
+        assert flight[col_timestamp].dtype == float, "timestamps must be float"
 
         flight_typecode = flight[col_typecode].iloc[0]
         if flight_typecode not in self.aircraft_params.ACFT_ICAO_TYPE.unique():
