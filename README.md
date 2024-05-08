@@ -36,19 +36,26 @@ from acropole import FuelEstimator
 fe = FuelEstimator()
 
 flight = pd.DataFrame({
-    "timestamp": [0.0, 1.0, 2.0, 3.0],
     "typecode": ["A320", "A320", "A320", "A320"],
     "groundspeed": [400, 410, 420, 430],
     "altitude": [10000, 11000, 12000, 13000],
     "vertical_rate": [2000, 1500, 1000, 500],
 
-    # airspeed and mass are optional
-    # "airspeed": [400, 410, 420, 430],
-    # "mass": [60000, 60000, 60000, 60000]
+    # optional features:
+    "timestamp": [0.0, 1.0, 2.0, 3.0],
+    "airspeed": [400, 410, 420, 430],
+    "mass": [60000, 60000, 60000, 60000]
 })
 
 flight_fuel = fe.estimate(flight)
 ```
+
+Note:
+
+- When `timestamp` is provided, the fuel estimation is more accurate,
+  especially due to **derivatives of speeds** (acceleration) used in the estimation.
+- `airspeed` is optional. If not provided, it is assumed to be equal
+  to groundspeed. However, accurate airspeed is recommended for better estimation.
 
 For a more complete example, refer to `examples/example.ipynb`
 

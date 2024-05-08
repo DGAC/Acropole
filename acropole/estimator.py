@@ -47,8 +47,6 @@ class FuelEstimator:
             - flight (pd.DataFrame): The flight data as a pandas DataFrame.
             - typecode (str): The column name for the aircraft type code.
                 Default is "typecode".
-            - timestamp (str): The column name for the timestamp (in second).
-                Default is "timestamp".
             - groundspeed (str): The column name for the groundspeed (in knot).
                 Default is "groundspeed".
             - altitude (str): The column name for the altitude (in feet).
@@ -57,6 +55,8 @@ class FuelEstimator:
                 Default is "vertical_rate".
 
         Optional arguments are:
+            - timestamp (str): The column name for the timestamp (in second).
+                Default is "timestamp".
             - airspeed (str): The column name for the airspeed (in knot).
                 Default is "airspeed".
             - mass (str): The column name for the mass (in kilogram).
@@ -64,6 +64,13 @@ class FuelEstimator:
 
         Returns:
             pd.DataFrame: The flight data with additional estimated fuel parameters.
+
+        Note:
+            - When `timestamp` is provided, the fuel estimation is more accurate,
+                especially due to **derivatives of speeds** (acceleration) used in the estimation.
+            - `airspeed` is optional. If not provided, it is assumed to be equal
+                to groundspeed. However, accurate airspeed is recommended for better estimation.
+
 
         Warnings:
             If the aircraft type code is not supported.
@@ -78,13 +85,15 @@ class FuelEstimator:
                 afe = FuelEstimator()
 
                 flight = pd.DataFrame({
-                    "timestamp": [0.0, 1.0, 2.0, 3.0],
                     "typecode": ["A320", "A320", "A320", "A320"],
                     "groundspeed": [400, 410, 420, 430],
                     "altitude": [10000, 11000, 12000, 13000],
                     "vertical_rate": [1000, 1000, 1000, 1000],
-                    "airspeed": [400, 410, 420, 430],
-                    "mass": [60000, 60000, 60000, 60000]
+
+                    # optional features:
+                    # "timestamp": [0.0, 1.0, 2.0, 3.0],
+                    # "airspeed": [400, 410, 420, 430],
+                    # "mass": [60000, 60000, 60000, 60000]
                 })
 
                 flight_fuel = afe.estimate(flight)
@@ -92,7 +101,6 @@ class FuelEstimator:
         """
 
         col_typecode = kwargs.get("typecode", "typecode")
-        col_timestamp = kwargs.get("timestamp", "timestamp")
         col_groundspeed = kwargs.get("groundspeed", "groundspeed")
         col_altitude = kwargs.get("altitude", "altitude")
         col_vertical_rate = kwargs.get("vertical_rate", "vertical_rate")
@@ -100,14 +108,15 @@ class FuelEstimator:
         col_mass = kwargs.get("mass", "mass")
 
         assert col_typecode in flight.columns, f"Column {col_typecode} not found"
-        assert col_timestamp in flight.columns, f"Column {col_timestamp} not found"
         assert col_groundspeed in flight.columns, f"Column {col_groundspeed} not found"
         assert col_altitude in flight.columns, f"Column {col_altitude} not found"
         assert (
             col_vertical_rate in flight.columns
         ), f"Column {col_vertical_rate} not found"
 
-        assert flight[col_timestamp].dtype == float, "timestamps must be float"
+        col_timestamp = kwargs.get("timestamp", None)
+        if col_timestamp is not None:
+            assert flight[col_timestamp].dtype == float, "timestamps must be float"
 
         flight_typecode = flight[col_typecode].iloc[0]
         if flight_typecode not in self.aircraft_params.ACFT_ICAO_TYPE.unique():
@@ -136,11 +145,19 @@ class FuelEstimator:
             )
 
         # compute devrivatives of altitude and speeds
-        flight = flight.assign(dt=lambda d: d[col_timestamp].diff().bfill()).assign(
-            d_altitude=lambda d: (d[col_altitude].diff().bfill() / d.dt),
-            d_groundspeed=lambda d: (d[col_groundspeed].diff().bfill() / d.dt),
-            d_airspeed=lambda d: (d[col_airspeed].diff().bfill() / d.dt),
-        )
+        if col_timestamp is None:
+            # if no timestamp provided, assume quasi-steady state
+            flight = flight.assign(
+                d_groundspeed=0,
+                d_airspeed=0,
+                d_altitude=lambda d: d[col_vertical_rate] / 60,  # ft/s
+            )
+        else:
+            flight = flight.assign(dt=lambda d: d[col_timestamp].diff().bfill()).assign(
+                d_groundspeed=lambda d: (d[col_groundspeed].diff().bfill() / d.dt),
+                d_airspeed=lambda d: (d[col_airspeed].diff().bfill() / d.dt),
+                d_altitude=lambda d: (d[col_altitude].diff().bfill() / d.dt),
+            )
 
         inputs = flight[
             [
@@ -167,7 +184,11 @@ class FuelEstimator:
         flight_fuel = flight_orig.assign(
             fuel_flow=single_engine_fuelflow * flight.ENGINE_NUM,
             fuel_flow_kgh=lambda d: d.fuel_flow * flight.FUEL_FLOW_TO * 3600,
-            fuel_cumsum=lambda d: (d.fuel_flow * flight.dt).cumsum(),
         )
+
+        if col_timestamp is not None:
+            flight_fuel = flight_fuel.assign(
+                fuel_cumsum=lambda d: (d.fuel_flow * flight.dt).cumsum()
+            )
 
         return flight_fuel
