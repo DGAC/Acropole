@@ -182,8 +182,8 @@ class FuelEstimator:
         single_engine_fuelflow = self.model.predict(data).squeeze()
 
         flight_fuel = flight_orig.assign(
-            fuel_flow=single_engine_fuelflow * flight.ENGINE_NUM,
-            fuel_flow_kgh=lambda d: d.fuel_flow * flight.FUEL_FLOW_TO * 3600,
+            fuel_flow=single_engine_fuelflow * flight.FUEL_FLOW_TO * flight.ENGINE_NUM,
+            fuel_flow_kgh=lambda d: d.fuel_flow * 3600,
         )
 
         if col_timestamp is not None:
