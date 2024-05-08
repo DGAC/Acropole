@@ -65,6 +65,27 @@ class FuelEstimator:
         Warnings:
             If the aircraft type code is not supported.
 
+        Example usage:
+
+            .. code:: python
+
+                import pandas as pd
+                from acropole import FuelEstimator
+
+                afe = FuelEstimator()
+
+                flight = pd.DataFrame({
+                    "timestamp": [0.0, 1.0, 2.0, 3.0],
+                    "typecode": ["A320", "A320", "A320", "A320"],
+                    "groundspeed": [400, 410, 420, 430],
+                    "altitude": [10000, 11000, 12000, 13000],
+                    "vertical_rate": [1000, 1000, 1000, 1000],
+                    "airspeed": [400, 410, 420, 430],
+                    "mass": [60000, 60000, 60000, 60000]
+                })
+
+                flight_fuel = afe.estimate(flight)
+
         """
 
         col_typecode = kwargs.get("typecode", "typecode")
@@ -84,6 +105,8 @@ class FuelEstimator:
             warnings.warn(
                 f"Aircraft type {flight_typecode} flight_typecode not supported"
             )
+
+        flight_orig = flight.copy()
 
         flight = flight.merge(
             self.aircraft_params,
@@ -132,10 +155,10 @@ class FuelEstimator:
 
         single_engine_fuelflow = self.model.predict(data).squeeze()
 
-        flight = flight.assign(
-            fuel_flow=lambda d: single_engine_fuelflow * d.ENGINE_NUM,
-            fuel_flow_kgh=lambda d: d.fuel_flow * d.FUEL_FLOW_TO * 3600,
-            fuel_cumsum=lambda d: (d.fuel_flow * d.dt).cumsum(),
+        flight_fuel = flight_orig.assign(
+            fuel_flow=single_engine_fuelflow * flight.ENGINE_NUM,
+            fuel_flow_kgh=lambda d: d.fuel_flow * flight.FUEL_FLOW_TO * 3600,
+            fuel_cumsum=lambda d: (d.fuel_flow * flight.dt).cumsum(),
         )
 
-        return flight
+        return flight_fuel
