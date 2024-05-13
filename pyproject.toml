@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "acropole"
+version = "1.0.0"
+homepage = "https://github.com/DGAC/Acropole/"
+repository = "https://github.com/DGAC/Acropole/"
+description = "Open-source library to predict aircraft fuel flow from trajectory data using machine learning models"
+authors = ["Gabriel JARRY <gabriel.jarry@aviation-civile.gouv.fr>"]
+license = "GNU Affero General Public License v3.0"
+readme = "README.md"
+
+packages = [{ include = "acropole", from = "." }]
+include = ["LICENSE"]
+
+[tool.poetry.dependencies]
+python = ">=3.8, <3.12"
+scipy = ">=1.13"
+joblib = ">=1.4"
+pandas = ">=2.2"
+scikit-learn = ">=1.4"
+numpy = ">=1.26"
+keras = "^2.15"
+tensorflow = "^2.15"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

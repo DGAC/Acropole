@@ -1,6 +1,0 @@
-scipy
-tensorflow
-joblib
-scikit-learn
-pandas
-numpy
