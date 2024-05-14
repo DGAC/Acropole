@@ -42,7 +42,7 @@ flight = pd.DataFrame({
     "vertical_rate": [2000, 1500, 1000, 500],
 
     # optional features:
-    "timestamp": [0.0, 1.0, 2.0, 3.0],
+    "second": [0.0, 1.0, 2.0, 3.0],
     "airspeed": [400, 410, 420, 430],
     "mass": [60000, 60000, 60000, 60000]
 })
@@ -52,29 +52,29 @@ flight_fuel = fe.estimate(flight)
 
 Note:
 
-- When `timestamp` is provided, the fuel estimation is more accurate,
+- When the `second` column is provided, the fuel estimation is more accurate,
   especially due to **derivatives of speeds** (acceleration) used in the estimation.
 - `airspeed` is optional. If not provided, it is assumed to be equal
   to groundspeed. However, accurate airspeed is recommended for better estimation.
 
-For a more complete example, refer to `examples/example.ipynb`
+For a more complete example, refer to `examples/fuel_estimation.ipynb`
 
 ## Aircraft data and estimation models
 
 Aircraft parameters from open data to feed the model are available in `data/aircraft_params.csv` and loaded by default. Model data is available in `models/` and also loaded by default.
 
-You can specify your own data and model file with the following initialization of `FuelEstimator`. You need to make sure the same column names are in your aircraft csv file.
+You can specify your own data and model file with the following initialization of `FuelEstimator`. You need to make sure the same column names are in your aircraft CSV file.
 
 ```python
 fe = FuelEstimator(
     aircraft_params_path="path/to/your/data.csv",
-    model_path="path/to/your/model.kears",
+    model_path="path/to/your/SavedModel/",
 )
 ```
 
 ## Model training and evaluation
 
-The Acropole model is a neural network built using data from Quick Access Recorder (QAR) from different aircraft types. Evaluation of the model and list of aircraft is available in https://github.com/DGAC/Acropole/tree/main/evaluation/Dense_Acropole_FuelFlow_Scaling.
+The Acropole model is a neural network built using data from Quick Access Recorder (QAR) from different aircraft types. Evaluation of the model and list of aircraft is available at https://github.com/DGAC/Acropole/tree/main/evaluation/Dense_Acropole_FuelFlow_Scaling.
 
 ## Credits
 

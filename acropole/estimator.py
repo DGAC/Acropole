@@ -34,10 +34,13 @@ class FuelEstimator:
 
         if model_path is None:
             model_path = pkg_resources.resource_filename(
-                "acropole", "models/acropole.keras"
+                "acropole", "models/acropole_fuel_model"
             )
 
-        self.model = tf.keras.models.load_model(model_path)
+        model = tf.saved_model.load(model_path)
+        self.predictor = model.signatures[
+            tf.saved_model.DEFAULT_SERVING_SIGNATURE_DEF_KEY
+        ]
 
     def estimate(self, flight: pd.DataFrame, **kwargs) -> pd.DataFrame:
         """
@@ -107,8 +110,6 @@ class FuelEstimator:
         col_airspeed = kwargs.get("airspeed", "airspeed")
         col_mass = kwargs.get("mass", "mass")
 
-        verbose = kwargs.get("verbose", None)
-
         assert col_typecode in flight.columns, f"Column {col_typecode} not found"
         assert col_groundspeed in flight.columns, f"Column {col_groundspeed} not found"
         assert col_altitude in flight.columns, f"Column {col_altitude} not found"
@@ -116,9 +117,11 @@ class FuelEstimator:
             col_vertical_rate in flight.columns
         ), f"Column {col_vertical_rate} not found"
 
-        col_timestamp = kwargs.get("timestamp", None)
-        if col_timestamp is not None:
-            assert flight[col_timestamp].dtype == float, "timestamps must be float"
+        col_second = kwargs.get("second", None)
+        if col_second is not None:
+            assert (
+                flight[col_second].dtype == float or int
+            ), "column for second must be float or integer"
 
         flight_typecode = flight[col_typecode].iloc[0]
         if flight_typecode not in self.aircraft_params.ACFT_ICAO_TYPE.unique():
@@ -147,7 +150,7 @@ class FuelEstimator:
             )
 
         # compute devrivatives of altitude and speeds
-        if col_timestamp is None:
+        if col_second is None:
             # if no timestamp provided, assume quasi-steady state
             flight = flight.assign(
                 d_groundspeed=0,
@@ -155,7 +158,7 @@ class FuelEstimator:
                 d_altitude=lambda d: d[col_vertical_rate] / 60,  # ft/s
             )
         else:
-            flight = flight.assign(dt=lambda d: d[col_timestamp].diff().bfill()).assign(
+            flight = flight.assign(dt=lambda d: d[col_second].diff().bfill()).assign(
                 d_groundspeed=lambda d: (d[col_groundspeed].diff().bfill() / d.dt),
                 d_airspeed=lambda d: (d[col_airspeed].diff().bfill() / d.dt),
                 d_altitude=lambda d: (d[col_altitude].diff().bfill() / d.dt),
@@ -179,16 +182,17 @@ class FuelEstimator:
         ]
 
         inputs_normalized = (inputs - self.MINIMUMS) / (self.MAXIMUMS - self.MINIMUMS)
-        data = tf.convert_to_tensor(inputs_normalized)
+        data = tf.convert_to_tensor(inputs_normalized, dtype=tf.float32)
 
-        single_engine_fuelflow = self.model.predict(data, verbose=verbose).squeeze()
+        key, values = self.predictor(data).popitem()
+        single_engine_fuelflow = values.numpy().squeeze()
 
         flight_fuel = flight_orig.assign(
             fuel_flow=single_engine_fuelflow * flight.FUEL_FLOW_TO * flight.ENGINE_NUM,
             fuel_flow_kgh=lambda d: d.fuel_flow * 3600,
         )
 
-        if col_timestamp is not None:
+        if col_second is not None:
             flight_fuel = flight_fuel.assign(
                 fuel_cumsum=lambda d: (d.fuel_flow * flight.dt).cumsum()
             )
