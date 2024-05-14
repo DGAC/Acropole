@@ -8,7 +8,7 @@ This repository contains the Acropole model for aircraft fuel flow prediction an
 To easy install, creating dedicated anaconda environment is recommended :
 
 ```sh
-conda create -n acropole python=3.8 -c conda-forge
+conda create -n acropole python=3.12 -c conda-forge
 ```
 
 Activate conda environment :
