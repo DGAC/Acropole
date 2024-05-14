@@ -107,6 +107,8 @@ class FuelEstimator:
         col_airspeed = kwargs.get("airspeed", "airspeed")
         col_mass = kwargs.get("mass", "mass")
 
+        verbose = kwargs.get("verbose", None)
+
         assert col_typecode in flight.columns, f"Column {col_typecode} not found"
         assert col_groundspeed in flight.columns, f"Column {col_groundspeed} not found"
         assert col_altitude in flight.columns, f"Column {col_altitude} not found"
@@ -179,7 +181,7 @@ class FuelEstimator:
         inputs_normalized = (inputs - self.MINIMUMS) / (self.MAXIMUMS - self.MINIMUMS)
         data = tf.convert_to_tensor(inputs_normalized)
 
-        single_engine_fuelflow = self.model.predict(data).squeeze()
+        single_engine_fuelflow = self.model.predict(data, verbose=verbose).squeeze()
 
         flight_fuel = flight_orig.assign(
             fuel_flow=single_engine_fuelflow * flight.FUEL_FLOW_TO * flight.ENGINE_NUM,
