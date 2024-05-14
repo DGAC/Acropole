@@ -18,8 +18,8 @@ joblib = ">=1.4"
 pandas = ">=2.2"
 scikit-learn = ">=1.4"
 numpy = ">=1.26"
-keras = ">3.0"
-tensorflow = ">=2.16"
+keras = "^3.3"
+tensorflow = "^2.16"
 
 
 [build-system]
