@@ -56,6 +56,7 @@ Note:
   especially due to **derivatives of speeds** (acceleration) used in the estimation.
 - `airspeed` is optional. If not provided, it is assumed to be equal
   to groundspeed. However, accurate airspeed is recommended for better estimation.
+- Expected sampling rate is 4 seconds, higher or lower sampling rate might induce noisier fuel flow. Resampling data before estimating fuel flow is recommanded.
 
 For a more complete example, refer to `examples/fuel_estimation.ipynb`
 
