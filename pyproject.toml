@@ -12,7 +12,7 @@ packages = [{ include = "acropole", from = "." }]
 include = ["LICENSE"]
 
 [tool.poetry.dependencies]
-python = ">=3.8, <=3.12.3"
+python = ">=3.9"
 scipy = ">=1.13"
 joblib = ">=1.4"
 pandas = ">=2.2"
