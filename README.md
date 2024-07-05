@@ -77,6 +77,33 @@ fe = FuelEstimator(
 
 The Acropole model is a neural network built using data from Quick Access Recorder (QAR) from different aircraft types. Evaluation of the model and list of aircraft is available at https://github.com/DGAC/Acropole/tree/main/evaluation/Dense_Acropole_FuelFlow_Scaling.
 
+
+## Comparison of Different Model Performances
+
+Comparison of different model performances per phase for 1000 test flights of A320-214 aircraft using real mass and true airspeed.
+
+| Phase | Samples \# | Metric | ACROPOLE | OpenAP | OpenAP V2 | BADA  | Poll-Schumann |
+|-------|------------|--------|--------------|--------------|------------|---------------|----------------|
+|       |            | **MAPE (%)**  | 2.13    | 30.35                     | 8.84       | 6.53                       | 6.85                                       |
+| CLIMB | 1,403,850   | **MAE (kg/min)** | 1.66          | 25.81                     | 6.92       | 5.53                       | 5.65                                       |
+|       |            | **ME (kg/min)**  | 0.85     | -25.66                    | -2.48      | -5.27                      | -4.62                                      |
+||||||||||
+|       |            | **MAPE (%)**  | 4.41   | 18.59                     | 10.69      | 7.01                       | 4.84                                       |
+| LEVEL | 4,017,801   | **MAE (kg/min)** | 1.82      | 7.82                      | 3.48       | 2.65                       | 2.03                                       |
+|       |            | **ME (kg/min)**  | 1.22     | -7.47                     | 2.64       | -1.43                      | -0.73                                      |
+||||||||||
+|       |            | **MAPE (%)**  | 12.63      | 51.69                     | 32.4       | 21.50                      | 21.55                                      |
+| DESCENT| 1,684,117  | **MAE (kg/min)** | 2.71         | 8.62                      | 5.58       | 3.71                       | 4.71                                       |
+|       |            | **ME (kg/min)**  | 1.88         | -1.75                     | -1.16      | -0.64                      | -3.67                                      |
+||||||||||
+|       |            | **MAPE (%)**  | 5.91       | 27.60                     | 14.71      | 9.84                       | 8.61                                       |
+| ALL   | 7,105,768   | **MAE (kg/min)** | 1.99        | 11.55                     | 4.58       | 3.44                       | 3.29                                       |
+|       |            | **ME (kg/min)**  | 1.30       | -9.92                     | 0.84       | -2.03                      | -2.09                                      |
+||||||||||
+|       |            | **Processing time (s)** | 3          | 284                      | 255        | 474                        | 28                                         |
+
+
+
 ## Credits
 
 ```bibtex
