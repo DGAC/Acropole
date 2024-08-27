@@ -107,12 +107,11 @@ Comparison of different model performances per phase for 1000 test flights of A3
 ## Credits
 
 ```bibtex
-@misc{jarry_towards_2024,
-    title = {Towards aircraft generic {Quick} {Access} {Recorder} fuel flow regression models for {ADS}-{B} data},
-    author = {Jarry, Gabriel and Delahaye, Daniel and Hurter, Christophe},
-    month = apr,
-    year = {2024},
-    doi = {10.13140/RG.2.2.23229.27360},
+@inproceedings{jarry2024towards,
+  title={Towards aircraft generic Quick Access Recorder fuel flow regression models for ADS-B data},
+  author={Jarry, Gabriel and Delahaye, Daniel and Hurter, Christophe},
+  booktitle={International Conference on Research in Air Transportation},
+  year={2024}
 }
 
 ```
