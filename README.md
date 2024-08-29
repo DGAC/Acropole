@@ -47,7 +47,7 @@ flight = pd.DataFrame({
     "mass": [60000, 60000, 60000, 60000]
 })
 
-flight_fuel = fe.estimate(flight)
+flight_fuel = fe.estimate(flight) #flight.data if traffic flight
 ```
 
 Note:
