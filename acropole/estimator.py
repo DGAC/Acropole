@@ -1,9 +1,9 @@
 import warnings
+from importlib.resources import files
 
 import numpy as np
+import onnxruntime as ort
 import pandas as pd
-import pkg_resources
-import tensorflow as tf
 
 
 class FuelEstimator:
@@ -21,26 +21,27 @@ class FuelEstimator:
 
         Args:
             aircraft_table_path (str): The path to the aircraft table. Default is None (use package data).
-            model_path (str): The path to the prediction model. Default is None (use package data).
+            model_path (str): The path to the prediction ONNX model. Default is None (use package data).
 
         """
 
         if aircraft_params_path is None:
-            aircraft_params_path = pkg_resources.resource_filename(
-                "acropole", "data/aircraft_params.csv"
+            aircraft_params_path = files("acropole").joinpath(
+                "data/aircraft_params.csv"
             )
 
         self.aircraft_params = pd.read_csv(aircraft_params_path)
 
         if model_path is None:
-            model_path = pkg_resources.resource_filename(
-                "acropole", "models/acropole_fuel_model"
+            model_path = files("acropole").joinpath(
+                "models/acropole_fuel_model.onnx"
             )
 
-        model = tf.saved_model.load(model_path)
-        self.predictor = model.signatures[
-            tf.saved_model.DEFAULT_SERVING_SIGNATURE_DEF_KEY
-        ]
+        self.session = ort.InferenceSession(
+            str(model_path), providers=["CPUExecutionProvider"]
+        )
+        self._input_name = self.session.get_inputs()[0].name
+        self._output_name = self.session.get_outputs()[0].name
 
     def estimate(self, flight: pd.DataFrame, **kwargs) -> pd.DataFrame:
         """
@@ -184,10 +185,10 @@ class FuelEstimator:
         ]
 
         inputs_normalized = (inputs - self.MINIMUMS) / (self.MAXIMUMS - self.MINIMUMS)
-        data = tf.convert_to_tensor(inputs_normalized, dtype=tf.float32)
+        data = inputs_normalized.to_numpy(dtype=np.float32)
 
-        key, values = self.predictor(data).popitem()
-        single_engine_fuelflow = values.numpy().squeeze()
+        values = self.session.run([self._output_name], {self._input_name: data})[0]
+        single_engine_fuelflow = values.squeeze()
 
         flight_fuel = flight_orig.assign(
             fuel_flow=single_engine_fuelflow * flight.FUEL_FLOW_TO * flight.ENGINE_NUM,

@@ -18,8 +18,12 @@ joblib = ">=1.4"
 pandas = ">=2.2"
 scikit-learn = ">=1.4"
 numpy = ">=1.26"
-keras = "^3.3"
-tensorflow = "^2.16"
+onnxruntime = ">=1.17"
+keras = { version = "^3.3", optional = true }
+tensorflow = { version = "^2.16", optional = true }
+
+[tool.poetry.extras]
+tf = ["keras", "tensorflow"]
 
 
 [build-system]
