@@ -4,25 +4,24 @@ This repository contains the Acropole model for aircraft fuel flow prediction an
 
 ## Easy Install
 
-For a trouble-free installation, creating a dedicated anaconda environment is recommended :
-
-```sh
-conda create -n acropole python=3.12 -c conda-forge
-```
-
-Activate the conda environment :
-
-```sh
-conda activate acropole
-```
-
-Install this library:
+This project uses [uv](https://docs.astral.sh/uv/) for environment and dependency management.
 
 ```sh
 git clone https://github.com/DGAC/Acropole.git
 cd Acropole
-pip install .
+uv sync
+```
 
+`uv sync` will create a virtual environment in `.venv/` and install Acropole with all its dependencies pinned from `uv.lock`. Run commands inside the environment with `uv run`, e.g.:
+
+```sh
+uv run python -c "from acropole import FuelEstimator; print(FuelEstimator())"
+```
+
+Or, if you'd rather install Acropole into an existing environment with `pip`:
+
+```sh
+pip install .
 ```
 
 ## Example of use
