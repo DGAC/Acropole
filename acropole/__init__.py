@@ -1,1 +1,1 @@
-from .estimator import FuelEstimator
+from .estimator import AircraftFuelEstimator, FuelEstimator
