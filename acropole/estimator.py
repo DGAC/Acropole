@@ -65,6 +65,18 @@ class FuelEstimator:
                 Default is "airspeed".
             - mass (str): The column name for the mass (in kilogram).
                 Default is "mass".
+            - d_altitude (str): The column name for a precomputed altitude
+                derivative (in feet/second). Default is "d_altitude". If the
+                column is absent, the value is derived from `timestamp` (if
+                given) or from `vertical_rate / 60`.
+            - d_groundspeed (str): The column name for a precomputed groundspeed
+                derivative (in knot/second). Default is "d_groundspeed". If the
+                column is absent, the value is derived from `timestamp` or
+                assumed to be zero (quasi-steady state).
+            - d_airspeed (str): The column name for a precomputed airspeed
+                derivative (in knot/second). Default is "d_airspeed". If the
+                column is absent, the value is derived from `timestamp` or
+                assumed to be zero (quasi-steady state).
 
         Returns:
             pd.DataFrame: The flight data with additional estimated fuel parameters.
@@ -112,6 +124,9 @@ class FuelEstimator:
         col_vertical_rate = kwargs.get("vertical_rate", "vertical_rate")
         col_airspeed = kwargs.get("airspeed", "airspeed")
         col_mass = kwargs.get("mass", "mass")
+        col_d_altitude = kwargs.get("d_altitude", "d_altitude")
+        col_d_groundspeed = kwargs.get("d_groundspeed", "d_groundspeed")
+        col_d_airspeed = kwargs.get("d_airspeed", "d_airspeed")
 
         assert col_typecode in flight.columns, f"Column {col_typecode} not found"
         assert col_groundspeed in flight.columns, f"Column {col_groundspeed} not found"
@@ -152,27 +167,46 @@ class FuelEstimator:
                 / (d.MAX_TO_WEIGHT - d.OPE_EMPTY_WEIGHT)
             )
 
-        # compute devrivatives of altitude and speeds
+        # compute derivatives of altitude and speeds for any the caller didn't provide
+        has_d_alt = col_d_altitude in flight.columns
+        has_d_gs = col_d_groundspeed in flight.columns
+        has_d_as = col_d_airspeed in flight.columns
+
         if col_second is None:
-            # if no timestamp provided, assume quasi-steady state
-            flight = flight.assign(
-                d_groundspeed=0,
-                d_airspeed=0,
-                d_altitude=lambda d: d[col_vertical_rate] / 60,  # ft/s
-            )
+            # quasi-steady-state fallback for missing derivatives
+            assigns = {}
+            if not has_d_gs:
+                assigns[col_d_groundspeed] = 0
+            if not has_d_as:
+                assigns[col_d_airspeed] = 0
+            if not has_d_alt:
+                assigns[col_d_altitude] = lambda d: d[col_vertical_rate] / 60  # ft/s
+            if assigns:
+                flight = flight.assign(**assigns)
         else:
-            flight = flight.assign(dt=lambda d: d[col_second].diff().bfill()).assign(
-                d_groundspeed=lambda d: (d[col_groundspeed].diff().bfill() / d.dt),
-                d_airspeed=lambda d: (d[col_airspeed].diff().bfill() / d.dt),
-                d_altitude=lambda d: (d[col_altitude].diff().bfill() / d.dt),
-            )
+            flight = flight.assign(dt=lambda d: d[col_second].diff().bfill())
+            assigns = {}
+            if not has_d_gs:
+                assigns[col_d_groundspeed] = (
+                    lambda d: d[col_groundspeed].diff().bfill() / d.dt
+                )
+            if not has_d_as:
+                assigns[col_d_airspeed] = (
+                    lambda d: d[col_airspeed].diff().bfill() / d.dt
+                )
+            if not has_d_alt:
+                assigns[col_d_altitude] = (
+                    lambda d: d[col_altitude].diff().bfill() / d.dt
+                )
+            if assigns:
+                flight = flight.assign(**assigns)
 
         inputs = flight[
             [
                 "ENGINE_TYPE",
-                "d_altitude",
-                "d_groundspeed",
-                "d_airspeed",
+                col_d_altitude,
+                col_d_groundspeed,
+                col_d_airspeed,
                 "SURFACE",
                 "MAX_OPE_ALTI",
                 "MAX_OPE_SPEED",
