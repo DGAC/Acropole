@@ -147,8 +147,7 @@ class FuelEstimator:
             )
 
         typecode = flight[col_typecode].iloc[0]
-        params = self._params_by_type.get(typecode)
-        if params is None:
+        if typecode not in self._params_by_type:
             warnings.warn(f"Aircraft type {typecode!r} not supported")
             result = flight.copy()
             result["fuel_flow"] = np.nan
@@ -158,90 +157,57 @@ class FuelEstimator:
             return result
 
         dtype = self.dtype
-        n = len(flight)
         gs = flight[col_groundspeed].to_numpy(dtype=dtype)
         alt = flight[col_altitude].to_numpy(dtype=dtype)
         vr = flight[col_vertical_rate].to_numpy(dtype=dtype)
-        if col_airspeed in flight.columns:
-            air = flight[col_airspeed].to_numpy(dtype=dtype)
-        else:
-            air = gs
+        air = (
+            flight[col_airspeed].to_numpy(dtype=dtype)
+            if col_airspeed in flight.columns
+            else None
+        )
+        mass = (
+            flight[col_mass].to_numpy(dtype=dtype)
+            if col_mass in flight.columns
+            else None
+        )
+        sec = (
+            flight[col_second].to_numpy(dtype=dtype)
+            if col_second is not None
+            else None
+        )
+        d_alt = (
+            flight[col_d_altitude].to_numpy(dtype=dtype)
+            if col_d_altitude in flight.columns
+            else None
+        )
+        d_gs = (
+            flight[col_d_groundspeed].to_numpy(dtype=dtype)
+            if col_d_groundspeed in flight.columns
+            else None
+        )
+        d_as = (
+            flight[col_d_airspeed].to_numpy(dtype=dtype)
+            if col_d_airspeed in flight.columns
+            else None
+        )
 
-        if col_mass in flight.columns:
-            mass = flight[col_mass].to_numpy(dtype=dtype)
-            mass_norm = (mass - params.OPE_EMPTY_WEIGHT) / (
-                params.MAX_TO_WEIGHT - params.OPE_EMPTY_WEIGHT
-            )
-        else:
-            mass_norm = np.full(n, self.DEFAULT_MASS, dtype=dtype)
-
-        if col_second is None:
-            dt = None
-            d_gs = (
-                flight[col_d_groundspeed].to_numpy(dtype=dtype)
-                if col_d_groundspeed in flight.columns
-                else np.zeros(n, dtype=dtype)
-            )
-            d_as = (
-                flight[col_d_airspeed].to_numpy(dtype=dtype)
-                if col_d_airspeed in flight.columns
-                else np.zeros(n, dtype=dtype)
-            )
-            d_alt = (
-                flight[col_d_altitude].to_numpy(dtype=dtype)
-                if col_d_altitude in flight.columns
-                else vr / dtype.type(60.0)
-            )
-        else:
-            sec = flight[col_second].to_numpy(dtype=dtype)
-            dt = _diff_bfill(sec)
-            d_gs = (
-                flight[col_d_groundspeed].to_numpy(dtype=dtype)
-                if col_d_groundspeed in flight.columns
-                else _diff_bfill(gs) / dt
-            )
-            d_as = (
-                flight[col_d_airspeed].to_numpy(dtype=dtype)
-                if col_d_airspeed in flight.columns
-                else _diff_bfill(air) / dt
-            )
-            d_alt = (
-                flight[col_d_altitude].to_numpy(dtype=dtype)
-                if col_d_altitude in flight.columns
-                else _diff_bfill(alt) / dt
-            )
-
-        inputs = np.empty((n, 12), dtype=dtype)
-        inputs[:, 0] = params.ENGINE_TYPE
-        inputs[:, 1] = d_alt
-        inputs[:, 2] = d_gs
-        inputs[:, 3] = d_as
-        inputs[:, 4] = params.SURFACE
-        inputs[:, 5] = params.MAX_OPE_ALTI
-        inputs[:, 6] = params.MAX_OPE_SPEED
-        inputs[:, 7] = alt
-        inputs[:, 8] = gs
-        inputs[:, 9] = air
-        inputs[:, 10] = vr
-        inputs[:, 11] = mass_norm
-
-        normalized = (inputs - self.MINIMUMS) / self._scale
-        if normalized.dtype != np.float32:
-            normalized = normalized.astype(np.float32)
-
-        values = self.session.run(
-            [self._output_name], {self._input_name: normalized}
-        )[0]
-        single = values.squeeze(axis=-1) if values.ndim == 2 else values.ravel()
-
-        scale = float(params.FUEL_FLOW_TO * params.ENGINE_NUM)
-        fuel_flow = single * scale
+        fuel_flow = self.for_aircraft(typecode).estimate(
+            groundspeed=gs,
+            altitude=alt,
+            vertical_rate=vr,
+            airspeed=air,
+            mass=mass,
+            second=sec,
+            d_altitude=d_alt,
+            d_groundspeed=d_gs,
+            d_airspeed=d_as,
+        )
 
         result = flight.copy()
         result["fuel_flow"] = fuel_flow
         result["fuel_flow_kgh"] = fuel_flow * 3600.0
         if col_second is not None:
-            result["fuel_cumsum"] = np.cumsum(fuel_flow * dt)
+            result["fuel_cumsum"] = np.cumsum(fuel_flow * _diff_bfill(sec))
         return result
 
     def for_aircraft(self, typecode: str) -> "AircraftFuelEstimator":
