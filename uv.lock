@@ -48,9 +48,9 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cyclopts", specifier = ">=4.5" },
-    { name = "numpy", specifier = ">=1.26" },
-    { name = "onnxruntime", specifier = ">=1.17" },
+    { name = "cyclopts", specifier = ">=4.18.0" },
+    { name = "numpy", specifier = ">=2.4.6" },
+    { name = "onnxruntime", specifier = ">=1.26.0" },
     { name = "pandas", marker = "extra == 'pandas'", specifier = ">=2.2" },
     { name = "polars", specifier = ">=1.0" },
 ]
@@ -64,7 +64,7 @@ dev = [
     { name = "pandas-stubs", specifier = ">=3.0.3.260530" },
     { name = "pip-audit", specifier = ">=2.0" },
     { name = "pre-commit", specifier = ">=4.6.0" },
-    { name = "pyarrow", specifier = ">=15" },
+    { name = "pyarrow", specifier = ">=24.0.0" },
     { name = "pytest", specifier = ">=9.0.3" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "ruff", specifier = ">=0.15.17" },
