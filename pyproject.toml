@@ -118,15 +118,16 @@ exclude_lines = [
 ]
 
 [tool.ruff]
-line-length = 100
+line-length = 88
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "UP", "B", "BLE", "C4", "C901", "S", "PLR", "RUF"]
+select = ["E", "F", "I", "N", "UP", "B", "BLE", "C4", "C901", "PLR", "S", "T20", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "N802"]  # asserts + non-snake test method names
 "tests/e2e/**" = ["S101", "N802", "S603"]  # + subprocess calls are intentional
+"src/acropole/cli.py" = ["T201"]  # the CLI prints to stdout/stderr by design
 
 [tool.ruff.lint.isort]
 known-first-party = ["acropole"]
@@ -149,6 +150,9 @@ python_version = "3.12"
 strict = true
 pretty = true
 warn_unused_configs = true
+disallow_any_generics = true
+disallow_any_unimported = true
+disallow_any_explicit = true
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 check_untyped_defs = true
