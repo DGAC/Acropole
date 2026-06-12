@@ -13,3 +13,5 @@ Task-oriented recipes for common Acropole workflows. Each guide assumes you alre
   several typecodes in one call.
 - **[Provide derivatives or `second`](derivatives.md)** — control how accelerations are
   computed for the model.
+- **[Estimate fuel from the command line](cli.md)** — enrich a flight file with the
+  `acropole` command, no Python required.

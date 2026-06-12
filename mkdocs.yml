@@ -47,7 +47,10 @@ nav:
     - Map your own columns: howto/columns-mapping.md
     - Multi-aircraft frames: howto/multi-aircraft.md
     - Derivatives & second: howto/derivatives.md
-  - Reference: reference/index.md
+    - From the command line: howto/cli.md
+  - Reference:
+    - Python API: reference/index.md
+    - CLI: reference/cli.md
   - Explanation:
     - Architecture: explanation/architecture.md
 

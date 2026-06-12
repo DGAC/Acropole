@@ -41,6 +41,7 @@ fuel-flow columns.
 - 🚀 **Fast ONNX runtime** — 2–4.8× faster than the original TensorFlow model, no TF dependency
 - 📈 **Temporal derivatives** — accelerations from a `second` column, or pre-computed
 - 🎯 **Column mapping** — point each feature at your own column names
+- 💻 **Command-line** — the `acropole estimate` command enriches a CSV/parquet file without writing Python
 
 ## Quick Start
 
@@ -62,6 +63,9 @@ flight = pd.DataFrame({
 flight_fuel = FuelEstimator().estimate(flight)
 # adds fuel_flow (kg/s), fuel_flow_kgh (kg/h)
 ```
+
+Prefer the command line? `acropole estimate flight.csv` writes an enriched
+`flight_fuel.csv` — see [Estimate fuel from the command line](howto/cli.md).
 
 ## Documentation
 

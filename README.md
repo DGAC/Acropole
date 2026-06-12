@@ -172,6 +172,33 @@ fe = FuelEstimator(
 Aircraft parameters from open data are bundled in `src/acropole/data/aircraft_params.csv`
 and the ONNX model in `src/acropole/models/`; both are loaded by default.
 
+## Command-Line
+
+Installing `acropole` also installs the `acropole` command (entry point
+`acropole.cli:main`). It reads a flight from a CSV or parquet file, estimates fuel flow,
+and **writes the enriched table back to disk** — adding `fuel_flow` (kg/s),
+`fuel_flow_kgh` (kg/h) and, with `--second`, `fuel_cumsum` (kg):
+
+```bash
+acropole estimate examples/example_flight.csv \
+  --typecode FLPL_AIRC_TYPE --groundspeed GRND_SPD_KT --altitude ALTI_STD_FT \
+  --vertical-rate VERT_SPD_FTMN --airspeed TRUE_AIR_SPD_KT --mass MASS_KG \
+  --second FLIGHT_TIME --out result.csv
+# wrote 7796 rows with fuel columns to result.csv
+```
+
+If your file already uses the standard column names, no mapping is needed and the output
+defaults to `<flight>_fuel.<ext>` next to the input:
+
+```bash
+acropole estimate flight.csv        # writes flight_fuel.csv
+```
+
+Each `--typecode`, `--groundspeed`, `--altitude`, `--vertical-rate`, `--airspeed`,
+`--mass` and `--second` flag maps a logical feature to the matching column in your file
+(defaults are the standard names). See the
+[CLI reference](https://DGAC.github.io/Acropole/reference/cli/) for all options.
+
 ## Comparison of Different Model Performances
 
 Comparison of different model performances per phase for 1000 test flights of A320-214 aircraft using real mass and true airspeed.

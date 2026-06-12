@@ -127,6 +127,19 @@ print(f"Mean fuel flow : {result['fuel_flow_kgh'].mean():.0f} kg/h")
 print(f"Total burned   : {result['fuel_cumsum'].iloc[-1]:.1f} kg")
 ```
 
+## Or from the command line
+
+If you have your flight in a CSV or parquet file, you can skip Python entirely. Installing
+`acropole` also installs the `acropole` command, which reads the file, estimates fuel flow,
+and **writes the enriched table back to disk**:
+
+```bash
+acropole estimate flight.csv   # writes flight_fuel.csv
+```
+
+See [Estimate fuel from the command line](../howto/cli.md) for column mapping, parquet
+output and batch processing.
+
 ## Next Steps
 
 - [How-To: map your own columns](../howto/columns-mapping.md)
