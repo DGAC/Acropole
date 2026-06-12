@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -104,7 +105,10 @@ class TestEstimateContract:
         assert out["fuel_flow"].is_finite().all()
 
     def test_second_adds_cumsum(self) -> None:
-        out = FuelEstimator().estimate(_flight(second=True), second="second")
+        out = cast(
+            "pd.DataFrame",
+            FuelEstimator().estimate(_flight(second=True), second="second"),
+        )
         assert "fuel_cumsum" in out.columns
         assert out["fuel_cumsum"].is_monotonic_increasing
 
@@ -116,7 +120,7 @@ class TestEstimateContract:
     def test_unsupported_typecode_warns_and_nans(self) -> None:
         flight = _flight(typecode="ZZZZ")
         with pytest.warns(UserWarning, match="not supported"):
-            out = FuelEstimator().estimate(flight)
+            out = cast("pd.DataFrame", FuelEstimator().estimate(flight))
         assert out["fuel_flow"].isna().all()
 
     def test_multi_typecode_uses_per_aircraft_params(self) -> None:
@@ -205,7 +209,9 @@ class TestEdgeCases:
         assert np.isnan(ff).all()
 
     def test_polars_cumsum(self) -> None:
-        out = FuelEstimator().estimate(pl.from_pandas(_flight(second=True)), second="second")
+        out = FuelEstimator().estimate(
+            pl.from_pandas(_flight(second=True)), second="second"
+        )
         assert "fuel_cumsum" in out.columns
 
     def test_dup_timestamps_yield_nan_not_inf(self) -> None:
@@ -268,7 +274,7 @@ class TestExampleFlight:
     @pytest.fixture(scope="class")
     def out(self) -> pd.DataFrame:
         flight = pd.read_csv(EXAMPLE).iloc[::4].reset_index(drop=True)
-        result: pd.DataFrame = FuelEstimator().estimate(flight, **MAPPING)
+        result = cast("pd.DataFrame", FuelEstimator().estimate(flight, **MAPPING))
         result["FUEL_FLOW_KGH"] = flight["FUEL_FLOW_KGH"]
         return result
 

@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import warnings
 from importlib.resources import files
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, cast
 
 import numpy as np
+import numpy.typing as npt
 import onnxruntime as ort
 import polars as pl
 
@@ -22,6 +23,11 @@ if TYPE_CHECKING:
     import pandas as pd
 
 __all__ = ["AircraftFuelEstimator", "FuelEstimator"]
+
+# Intermediate numpy arrays carry the estimator's working precision (float32 or
+# float64); float64 is the widest, so it types the public surface without Any.
+type FloatArray = npt.NDArray[np.float64]
+type FloatDType = np.dtype[np.float64]
 
 # Normalization bounds, one entry per model input feature (order matters):
 # engine_type, d_altitude, d_groundspeed, d_airspeed, surface, max_ope_alti,
@@ -35,7 +41,7 @@ _DEFAULT_MASS = -1.0
 _MODEL_OUTPUT_NDIM = 2
 
 
-def diff_bfill(arr: np.ndarray) -> np.ndarray:
+def diff_bfill(arr: FloatArray) -> FloatArray:
     """numpy equivalent of ``pandas.Series.diff().bfill()``.
 
     The first element repeats the first valid difference (index 1). For a
@@ -54,7 +60,7 @@ def diff_bfill(arr: np.ndarray) -> np.ndarray:
     return out
 
 
-def safe_divide(num: np.ndarray, den: np.ndarray) -> np.ndarray:
+def safe_divide(num: FloatArray, den: FloatArray) -> FloatArray:
     """Element-wise division that yields NaN (not inf) where the denominator is 0.
 
     Duplicate consecutive timestamps produce ``dt == 0``; rather than emit an
@@ -81,26 +87,38 @@ class AircraftFuelEstimator:
     def __init__(
         self,
         typecode: str,
-        aircraft_params_path: Annotated[str | None, "CSV path; None -> package data"] = None,
+        aircraft_params_path: Annotated[
+            str | None, "CSV path; None -> package data"
+        ] = None,
         model_path: Annotated[str | None, "ONNX path; None -> package data"] = None,
-        dtype: Annotated[Any, "intermediate numpy precision"] = np.float64,
+        dtype: Annotated[npt.DTypeLike, "intermediate numpy precision"] = np.float64,
     ) -> None:
         if aircraft_params_path is None:
-            aircraft_params_path = str(files("acropole").joinpath("data/aircraft_params.csv"))
+            aircraft_params_path = str(
+                files("acropole").joinpath("data/aircraft_params.csv")
+            )
         params = pl.read_csv(aircraft_params_path)
         row = params.filter(pl.col("ACFT_ICAO_TYPE") == typecode)
         if row.is_empty():
             raise ValueError(f"Aircraft type {typecode!r} not in aircraft_params")
 
         if model_path is None:
-            model_path = str(files("acropole").joinpath("models/acropole_fuel_model.onnx"))
-        session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
+            model_path = str(
+                files("acropole").joinpath("models/acropole_fuel_model.onnx")
+            )
+        session = ort.InferenceSession(
+            str(model_path), providers=["CPUExecutionProvider"]
+        )
 
-        self._init_from(typecode, row.to_dicts()[0], session, np.dtype(dtype))
+        self._init_from(
+            typecode, row.to_dicts()[0], session, cast("FloatDType", np.dtype(dtype))
+        )
 
     @classmethod
-    def _from_shared(cls, estimator: FuelEstimator, typecode: str) -> AircraftFuelEstimator:
-        """Build bound to ``typecode`` reusing ``estimator``'s session/params (no reload)."""
+    def _from_shared(
+        cls, estimator: FuelEstimator, typecode: str
+    ) -> AircraftFuelEstimator:
+        """Build bound to ``typecode``, reusing ``estimator``'s session/params."""
         params = estimator._params_by_type.get(typecode)
         if params is None:
             raise ValueError(f"Aircraft type {typecode!r} not in aircraft_params")
@@ -108,12 +126,12 @@ class AircraftFuelEstimator:
         obj._init_from(typecode, params, estimator.session, estimator.dtype)
         return obj
 
-    def _init_from(
+    def _init_from(  # type: ignore[no-any-unimported]  # ort.InferenceSession: no stubs
         self,
         typecode: str,
-        params: dict[str, Any],
+        params: dict[str, object],  # polars row: heterogeneous CSV values
         session: ort.InferenceSession,
-        dtype: np.dtype,
+        dtype: FloatDType,
     ) -> None:
         self.typecode = typecode
         self.dtype = dtype
@@ -121,31 +139,38 @@ class AircraftFuelEstimator:
         self._input_name = session.get_inputs()[0].name
         self._output_name = session.get_outputs()[0].name
 
-        cast = dtype.type
-        self._engine_type = cast(params["ENGINE_TYPE"])
-        self._surface = cast(params["SURFACE"])
-        self._max_ope_alti = cast(params["MAX_OPE_ALTI"])
-        self._max_ope_speed = cast(params["MAX_OPE_SPEED"])
-        self._ope_empty_weight = cast(params["OPE_EMPTY_WEIGHT"])
-        self._mass_range = cast(params["MAX_TO_WEIGHT"] - params["OPE_EMPTY_WEIGHT"])
-        self._fuel_scale = float(params["FUEL_FLOW_TO"] * params["ENGINE_NUM"])
+        # params holds a polars CSV row (dict[str, object]); the queried columns
+        # are numeric by construction, so the float coercions below are sound —
+        # the ignores silence object-operand noise, not a real type risk.
+        to_dtype = dtype.type
+        self._engine_type = to_dtype(params["ENGINE_TYPE"])  # type: ignore[arg-type]
+        self._surface = to_dtype(params["SURFACE"])  # type: ignore[arg-type]
+        self._max_ope_alti = to_dtype(params["MAX_OPE_ALTI"])  # type: ignore[arg-type]
+        self._max_ope_speed = to_dtype(params["MAX_OPE_SPEED"])  # type: ignore[arg-type]
+        self._ope_empty_weight = to_dtype(params["OPE_EMPTY_WEIGHT"])  # type: ignore[arg-type]
+        self._mass_range = to_dtype(
+            params["MAX_TO_WEIGHT"] - params["OPE_EMPTY_WEIGHT"]  # type: ignore[operator]
+        )
+        self._fuel_scale = float(
+            params["FUEL_FLOW_TO"] * params["ENGINE_NUM"]  # type: ignore[operator]
+        )
 
         self._mins = np.array(_MINIMUMS, dtype=dtype)
         self._scale = np.array(_MAXIMUMS, dtype=dtype) - self._mins
 
     def estimate(
         self,
-        groundspeed: np.ndarray,
-        altitude: np.ndarray,
-        vertical_rate: np.ndarray,
+        groundspeed: FloatArray,
+        altitude: FloatArray,
+        vertical_rate: FloatArray,
         *,
-        airspeed: np.ndarray | None = None,
-        mass: np.ndarray | None = None,
-        second: np.ndarray | None = None,
-        d_altitude: np.ndarray | None = None,
-        d_groundspeed: np.ndarray | None = None,
-        d_airspeed: np.ndarray | None = None,
-    ) -> np.ndarray:
+        airspeed: FloatArray | None = None,
+        mass: FloatArray | None = None,
+        second: FloatArray | None = None,
+        d_altitude: FloatArray | None = None,
+        d_groundspeed: FloatArray | None = None,
+        d_airspeed: FloatArray | None = None,
+    ) -> FloatArray:
         """Predict per-sample fuel flow in **kg/s** (1-D array of length N)."""
         dtype = self.dtype
         gs = np.asarray(groundspeed, dtype=dtype)
@@ -177,11 +202,19 @@ class AircraftFuelEstimator:
         if normalized.dtype != np.float32:
             normalized = normalized.astype(np.float32)
 
-        values = self.session.run([self._output_name], {self._input_name: normalized})[0]
-        single = values.squeeze(axis=-1) if values.ndim == _MODEL_OUTPUT_NDIM else values.ravel()
+        values = self.session.run([self._output_name], {self._input_name: normalized})[
+            0
+        ]
+        single = (
+            values.squeeze(axis=-1)
+            if values.ndim == _MODEL_OUTPUT_NDIM
+            else values.ravel()
+        )
         return np.asarray(single * self._fuel_scale)
 
-    def _mass_norm(self, mass: np.ndarray | None, n: int, dtype: np.dtype) -> np.ndarray:
+    def _mass_norm(
+        self, mass: FloatArray | None, n: int, dtype: FloatDType
+    ) -> FloatArray:
         if mass is None:
             return np.full(n, self.DEFAULT_MASS, dtype=dtype)
         if self._mass_range == 0:
@@ -191,22 +224,24 @@ class AircraftFuelEstimator:
                 stacklevel=2,
             )
             return np.full(n, np.nan, dtype=dtype)
-        out = (np.asarray(mass, dtype=dtype) - self._ope_empty_weight) / self._mass_range
+        out = (
+            np.asarray(mass, dtype=dtype) - self._ope_empty_weight
+        ) / self._mass_range
         return np.asarray(out)
 
     def _derivatives(
         self,
         n: int,
-        dtype: np.dtype,
-        alt: np.ndarray,
-        gs: np.ndarray,
-        air: np.ndarray,
-        vr: np.ndarray,
-        second: np.ndarray | None,
-        d_altitude: np.ndarray | None,
-        d_groundspeed: np.ndarray | None,
-        d_airspeed: np.ndarray | None,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        dtype: FloatDType,
+        alt: FloatArray,
+        gs: FloatArray,
+        air: FloatArray,
+        vr: FloatArray,
+        second: FloatArray | None,
+        d_altitude: FloatArray | None,
+        d_groundspeed: FloatArray | None,
+        d_airspeed: FloatArray | None,
+    ) -> tuple[FloatArray, FloatArray, FloatArray]:
         if second is None:
             d_alt = (
                 np.asarray(d_altitude, dtype=dtype)
@@ -257,26 +292,36 @@ class FuelEstimator:
 
     def __init__(
         self,
-        aircraft_params_path: Annotated[str | None, "CSV path; None -> package data"] = None,
+        aircraft_params_path: Annotated[
+            str | None, "CSV path; None -> package data"
+        ] = None,
         model_path: Annotated[str | None, "ONNX path; None -> package data"] = None,
-        dtype: Annotated[Any, "intermediate numpy precision"] = np.float64,
+        dtype: Annotated[npt.DTypeLike, "intermediate numpy precision"] = np.float64,
     ) -> None:
         if aircraft_params_path is None:
-            aircraft_params_path = str(files("acropole").joinpath("data/aircraft_params.csv"))
+            aircraft_params_path = str(
+                files("acropole").joinpath("data/aircraft_params.csv")
+            )
         params = pl.read_csv(aircraft_params_path)
         self._params_by_type = {row["ACFT_ICAO_TYPE"]: row for row in params.to_dicts()}
 
         if model_path is None:
-            model_path = str(files("acropole").joinpath("models/acropole_fuel_model.onnx"))
-        self.session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
-        self.dtype = np.dtype(dtype)
+            model_path = str(
+                files("acropole").joinpath("models/acropole_fuel_model.onnx")
+            )
+        self.session = ort.InferenceSession(
+            str(model_path), providers=["CPUExecutionProvider"]
+        )
+        self.dtype: FloatDType = cast("FloatDType", np.dtype(dtype))
 
     def for_aircraft(self, typecode: str) -> AircraftFuelEstimator:
         """Return an :class:`AircraftFuelEstimator` bound to ``typecode``, reusing
         this estimator's already-loaded ONNX session and parameters (no reload)."""
         return AircraftFuelEstimator._from_shared(self, typecode)
 
-    def estimate(self, flight: pd.DataFrame | pl.DataFrame, **kwargs: str) -> Any:
+    def estimate(
+        self, flight: pd.DataFrame | pl.DataFrame, **kwargs: str
+    ) -> pd.DataFrame | pl.DataFrame:
         """Estimate fuel flow for ``flight``; see class docstring for columns.
 
         Column-name overrides via kwargs: ``typecode``, ``groundspeed``,
@@ -329,10 +374,14 @@ class FuelEstimator:
         second_col = col["second"]
         if second_col is not None:
             sec = df[second_col].to_numpy().astype(self.dtype)
-            out = out.with_columns(pl.Series("fuel_cumsum", np.cumsum(fuel_flow * diff_bfill(sec))))
+            out = out.with_columns(
+                pl.Series("fuel_cumsum", np.cumsum(fuel_flow * diff_bfill(sec)))
+            )
         return out.to_pandas() if was_pandas else out
 
-    def _predict_grouped(self, df: pl.DataFrame, col: dict[str, str | None]) -> np.ndarray:
+    def _predict_grouped(
+        self, df: pl.DataFrame, col: dict[str, str | None]
+    ) -> FloatArray:
         """Run inference per typecode group, scattering results back to row order."""
         typecode_col = col["typecode"] or "typecode"
         result = np.full(df.height, np.nan, dtype=self.dtype)
@@ -343,24 +392,42 @@ class FuelEstimator:
                 warnings.warn(f"Aircraft type {typecode!r} not supported", stacklevel=3)
                 continue  # leave NaN for unsupported rows
             sub = df.filter(pl.lit(mask))
-            result[mask] = self.for_aircraft(typecode).estimate(**self._extract(sub, col))
+            groundspeed, altitude, vertical_rate, optional = self._extract(sub, col)
+            result[mask] = self.for_aircraft(typecode).estimate(
+                groundspeed, altitude, vertical_rate, **optional
+            )
         return result
 
-    def _extract(self, sub: pl.DataFrame, col: dict[str, str | None]) -> dict[str, Any]:
-        """Pull numpy arrays for one typecode group from the chosen columns."""
+    def _extract(
+        self, sub: pl.DataFrame, col: dict[str, str | None]
+    ) -> tuple[FloatArray, FloatArray, FloatArray, dict[str, FloatArray | None]]:
+        """Split a typecode group into its required arrays and optional kwargs.
+
+        The three required columns are guaranteed present by ``estimate``'s
+        upfront validation, so they are returned non-optional; the rest become
+        ``estimate``'s keyword-only arguments (``None`` when their column is
+        absent).
+        """
         dtype = self.dtype
 
-        def arr(key: str) -> np.ndarray | None:
+        def arr(key: str) -> FloatArray | None:
             """Numpy array for column ``col[key]`` if present, else None."""
             name = col[key]
             if name is None or name not in sub.columns:
                 return None
             return sub[name].to_numpy().astype(dtype)
 
-        return {
-            "groundspeed": arr("groundspeed"),
-            "altitude": arr("altitude"),
-            "vertical_rate": arr("vertical_rate"),
+        def required(key: str) -> FloatArray:
+            """Array for a column ``estimate`` already validated as present."""
+            name = col[key]
+            if name is None:  # unreachable: validated in estimate() upfront
+                raise ValueError(f"Column for {key!r} not found")
+            return sub[name].to_numpy().astype(dtype)
+
+        groundspeed = required("groundspeed")
+        altitude = required("altitude")
+        vertical_rate = required("vertical_rate")
+        optional = {
             "airspeed": arr("airspeed"),
             "mass": arr("mass"),
             "second": arr("second"),
@@ -368,3 +435,4 @@ class FuelEstimator:
             "d_groundspeed": arr("d_groundspeed"),
             "d_airspeed": arr("d_airspeed"),
         }
+        return groundspeed, altitude, vertical_rate, optional
