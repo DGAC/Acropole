@@ -90,11 +90,14 @@ flight_fuel = fe.estimate(
 
 `acropole` predicts the **total** aircraft fuel flow (single-engine output
 scaled by `ENGINE_NUM`), whereas `FUEL_FLOW_KGH` in the file is recorded
-**per engine**. To compare like with like on this twin-engine aircraft we scale
-the measured trace by 2:
+**per engine**. To compare like with like, scale the measured trace by the
+engine count — `2` for this A320, but read it from your own data rather than
+hard-coding it (a quad would be `4`):
 
 ```python
-plt.plot(flight_fuel.FLIGHT_TIME, flight_fuel.FUEL_FLOW_KGH * 2, lw=1, label="actual (kg/h)")
+n_engines = 2  # A320 — use ENGINE_NUM for your aircraft
+
+plt.plot(flight_fuel.FLIGHT_TIME, flight_fuel.FUEL_FLOW_KGH * n_engines, lw=1, label="actual (kg/h)")
 plt.plot(flight_fuel.FLIGHT_TIME, flight_fuel.fuel_flow_kgh, alpha=0.8, lw=1, label="estimate (kg/h)")
 plt.legend()
 plt.show()

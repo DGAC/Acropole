@@ -50,22 +50,39 @@ This is the least accurate path — prefer Option A whenever you have timestamps
 
 ## Option C — supply pre-computed derivatives
 
-If you already have accelerations from your own pipeline, pass them directly. Any
-derivative you supply overrides what Acropole would compute; any you omit is derived from
-`second` (if given) or falls back as in Option B:
+If you already have accelerations from your own pipeline, put them in the frame and point
+`estimate` at those columns. Any derivative you supply overrides what Acropole would
+compute; any you omit is derived from `second` (if given) or falls back as in Option B:
 
 ```python
+flight = pd.DataFrame({
+    "typecode": ["A320", "A320", "A320"],
+    "groundspeed": [400, 410, 420],
+    "altitude": [10000, 11000, 12000],
+    "vertical_rate": [2000, 1500, 1000],
+    "second": [0.0, 4.0, 8.0],
+    # your own per-second derivatives:
+    "d_alt": [25.0, 25.0, 25.0],   # ft/s
+    "d_gs": [2.5, 2.5, 2.5],       # kt/s
+    "d_as": [2.5, 2.5, 2.5],       # kt/s
+})
+
 result = fe.estimate(
     flight,
-    second="FLIGHT_TIME",
-    d_altitude="DALT",
-    d_groundspeed="DGS",
-    d_airspeed="DAS",
+    second="second",
+    d_altitude="d_alt",
+    d_groundspeed="d_gs",
+    d_airspeed="d_as",
 )
 ```
 
 This mixes freely: e.g. supply `d_groundspeed` only, and `d_altitude` / `d_airspeed` are
 still derived from `second`.
+
+!!! warning "Mapped columns must exist"
+    A derivative column you name but that is **absent** from the frame is silently
+    ignored — `estimate` falls back to deriving it (no error is raised). Double-check the
+    column names match, or the pre-computed values you intended to pass will be dropped.
 
 ## Summary
 
