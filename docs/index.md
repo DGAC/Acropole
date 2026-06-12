@@ -16,13 +16,13 @@ hide:
   <a href="https://github.com/DGAC/Acropole/actions/workflows/ci.yml">
     <img src="https://github.com/DGAC/Acropole/actions/workflows/ci.yml/badge.svg" alt="CI" />
   </a>
-  <a href="https://DGAC.github.io/Acropole/">
+  <a href="https://forge.axm-protocols.io/audit/">
     <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/DGAC/Acropole/gh-pages/badges/axm-audit.json" alt="axm-audit" />
   </a>
-  <a href="https://DGAC.github.io/Acropole/">
+  <a href="https://forge.axm-protocols.io/init/">
     <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/DGAC/Acropole/gh-pages/badges/axm-init.json" alt="axm-init" />
   </a>
-  <a href="https://DGAC.github.io/Acropole/">
+  <a href="https://github.com/DGAC/Acropole/actions/workflows/ci.yml">
     <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/DGAC/Acropole/gh-pages/badges/coverage.json" alt="coverage" />
   </a>
   <a href="https://pypi.org/project/acropole/">
