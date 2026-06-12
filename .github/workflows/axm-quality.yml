@@ -37,7 +37,7 @@ jobs:
             mkdir -p "$DIR"
             local SCORE_INT=$(python3 -c "print(int(float('${VALUE}')))")
             local COLOR=$(score_color "$SCORE_INT")
-            if [ -n "$LOGO_FILE" ] && [ -f "$LOGO_FILE" ]; then
+            if [ -n "$LOGO_FILE" ] && [ -s "$LOGO_FILE" ]; then
               local LOGO=$(cat "$LOGO_FILE")
               jq -n --arg l "$LABEL" --arg v "$VALUE" --arg c "$COLOR" --arg logo "$LOGO" \
                 '{schemaVersion:1, label:$l, message:"\($v)%", color:$c, logoSvg:$logo, style:"flat"}' \
@@ -50,10 +50,10 @@ jobs:
           }
           HELPERS
 
-          # Pre-fetch logos once
-          curl -fsSL https://raw.githubusercontent.com/axm-protocols/axm-audit/main/assets/logo.svg \
+          # Pre-fetch the AXM logo once (one logo for both quality badges)
+          curl -fsSL https://raw.githubusercontent.com/axm-protocols/axm-forge/main/assets/logo.svg \
             > /tmp/audit-logo.svg || true
-          curl -fsSL https://raw.githubusercontent.com/axm-protocols/axm-init/main/assets/logo.svg \
+          curl -fsSL https://raw.githubusercontent.com/axm-protocols/axm-forge/main/assets/logo.svg \
             > /tmp/init-logo.svg || true
 
       # ── Tests with coverage ────────────────────────────────────────
