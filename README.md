@@ -8,12 +8,13 @@
 
 <p align="center">
   <a href="https://github.com/DGAC/Acropole/actions/workflows/ci.yml"><img src="https://github.com/DGAC/Acropole/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://DGAC.github.io/Acropole/"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/DGAC/Acropole/gh-pages/badges/axm-audit.json" alt="axm-audit"></a>
+  <a href="https://DGAC.github.io/Acropole/"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/DGAC/Acropole/gh-pages/badges/axm-init.json" alt="axm-init"></a>
+  <a href="https://DGAC.github.io/Acropole/"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/DGAC/Acropole/gh-pages/badges/coverage.json" alt="coverage"></a>
   <a href="https://pypi.org/project/acropole/"><img src="https://img.shields.io/pypi/v/acropole" alt="PyPI"></a>
   <img src="https://img.shields.io/badge/python-3.12%2B-blue" alt="Python 3.12+">
   <a href="https://github.com/DGAC/Acropole/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License: AGPL-3.0"></a>
   <a href="https://DGAC.github.io/Acropole/"><img src="https://img.shields.io/badge/docs-live-brightgreen" alt="Docs"></a>
-  <a href="https://DGAC.github.io/Acropole/"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/DGAC/Acropole/gh-pages/badges/acropole/axm-audit.json" alt="axm-audit"></a>
-  <a href="https://DGAC.github.io/Acropole/"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/DGAC/Acropole/gh-pages/badges/acropole/axm-init.json" alt="axm-init"></a>
 </p>
 
 ---
