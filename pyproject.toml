@@ -4,7 +4,7 @@ description = "Open-source library to predict aircraft fuel flow from trajectory
 readme = "README.md"
 license = { text = "GNU Affero General Public License v3.0" }
 authors = [
-    { name = "Gabriel JARRY", email = "gabriel.jarry@aviation-civile.gouv.fr" },
+    { name = "Gabriel JARRY", email = "jarry.gabriel@gmail.com" },
 ]
 requires-python = ">=3.12"
 dynamic = ["version"]

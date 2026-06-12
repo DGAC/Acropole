@@ -9,7 +9,6 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from acropole import FuelEstimator as FuelEstimatorPublic
 from acropole.estimator import (
     AircraftFuelEstimator,
     FuelEstimator,
@@ -29,7 +28,31 @@ MAPPING = {
     "mass": "MASS_KG",
 }
 
-MIN_CORRELATION = 0.97
+# example_flight.csv is an A320 (twin-engine); its FUEL_FLOW_KGH is recorded per
+# engine, so the total is the measurement times ENGINE_NUM.
+ENGINE_NUM = 2
+
+# Golden reference: predicted fuel_flow_kgh at fixed row indices, captured from
+# the validated ONNX model (numerically identical to the TensorFlow baseline,
+# tag v0.1.0-alpha). A drift in the model, feature order or normalization breaks
+# this. Regenerate intentionally only when the model itself changes.
+GOLDEN_FUEL_FLOW_KGH = {
+    100: 681.626,
+    300: 5175.145,
+    500: 3577.721,
+    800: 2725.447,
+    1200: 2672.506,
+    1500: 2647.173,
+    1900: 683.029,
+}
+
+# Measured MAPE on this flight (in-flight points) is ~5.3%; bound it generously
+# but tightly enough to catch a real regression.
+MAX_MAPE_PCT = 7.0
+
+# Below this measured fuel flow (kg/h, total) the aircraft is idling on the
+# ground; those points are excluded from the MAPE so taxi noise doesn't dominate.
+IN_FLIGHT_THRESHOLD_KGH = 50.0
 
 
 def _flight(n: int = 8, typecode: str = "A320", second: bool = False) -> pd.DataFrame:
@@ -194,34 +217,73 @@ class TestEdgeCases:
         # safe_divide turns the dt==0 derivative into NaN, never inf
         assert not np.isinf(out["fuel_flow"].to_numpy()).any()
 
+    def test_single_row_flight(self) -> None:
+        out = FuelEstimator().estimate(_flight(n=1))
+        assert len(out) == 1
+        assert np.isfinite(out["fuel_flow"].to_numpy()).all()
+
+    def test_fuel_flow_kgh_is_3600_times_fuel_flow(self) -> None:
+        out = FuelEstimator().estimate(_flight())
+        np.testing.assert_allclose(
+            out["fuel_flow_kgh"].to_numpy(),
+            out["fuel_flow"].to_numpy() * 3600.0,
+            rtol=1e-9,
+        )
+
+    def test_column_order_is_irrelevant(self) -> None:
+        # mapping is by name, so a shuffled frame must give identical results
+        flight = _flight()
+        shuffled = flight[flight.columns[::-1]]
+        a = FuelEstimator().estimate(flight)["fuel_flow"].to_numpy()
+        b = FuelEstimator().estimate(shuffled)["fuel_flow"].to_numpy()
+        np.testing.assert_array_equal(a, b)
+
+    def test_float32_close_to_float64(self) -> None:
+        flight = _flight(n=16)
+        f64 = FuelEstimator(dtype=np.float64).estimate(flight)["fuel_flow"].to_numpy()
+        f32 = FuelEstimator(dtype=np.float32).estimate(flight)["fuel_flow"].to_numpy()
+        np.testing.assert_allclose(f32, f64, rtol=1e-3)
+
+    def test_typecode_is_case_sensitive(self) -> None:
+        # lowercase typecode is not in the table -> warns + NaN (documents behavior)
+        flight = _flight(typecode="a320")
+        with pytest.warns(UserWarning, match="not supported"):
+            out = FuelEstimator().estimate(flight)
+        assert out["fuel_flow"].isna().all()
+
 
 @pytest.mark.skipif(not EXAMPLE.exists(), reason="example_flight.csv not packaged")
 class TestExampleFlight:
-    """Real example-flight predictions vs measured fuel flow.
+    """End-to-end behaviour on the real example flight (fixture CSV).
 
-    Uses the packaged ONNX model and the example flight shipped under examples/.
-    The CSV carries FUEL_FLOW_KGH (measured) — asserting the prediction tracks it
-    guards against model-path / normalization regressions far better than a toy
-    frame. Classified unit: the data is a local fixture, the model is packaged, no
-    external boundary (network/DB/subprocess) is crossed.
+    The packaged CSV carries the measured FUEL_FLOW_KGH; the golden assertion
+    pins exact predicted values (the regression net for the TF→ONNX migration)
+    and the MAPE bound checks the estimate stays close to the measurement —
+    either catches a drift a mere correlation check would silently pass.
     """
 
     @pytest.fixture(scope="class")
-    def prediction(self) -> tuple[pd.Series, pd.Series]:
+    def out(self) -> pd.DataFrame:
         flight = pd.read_csv(EXAMPLE).iloc[::4].reset_index(drop=True)
-        out = FuelEstimatorPublic().estimate(flight, **MAPPING)
-        return out["fuel_flow_kgh"], flight["FUEL_FLOW_KGH"]
+        result: pd.DataFrame = FuelEstimator().estimate(flight, **MAPPING)
+        result["FUEL_FLOW_KGH"] = flight["FUEL_FLOW_KGH"]
+        return result
 
-    def test_no_nan(self, prediction: tuple[pd.Series, pd.Series]) -> None:
-        pred, _ = prediction
-        assert not pred.isna().any()
+    def test_no_nan(self, out: pd.DataFrame) -> None:
+        assert not out["fuel_flow_kgh"].isna().any()
 
-    def test_tracks_measured_fuel_flow(self, prediction: tuple[pd.Series, pd.Series]) -> None:
-        pred, real = prediction
-        # the predicted curve must match the measured fuel flow closely
-        assert float(pred.corr(real)) > MIN_CORRELATION
+    def test_golden_values(self, out: pd.DataFrame) -> None:
+        # Exact regression net: pinned predictions must not drift.
+        pred = out["fuel_flow_kgh"].to_numpy()
+        for idx, expected in GOLDEN_FUEL_FLOW_KGH.items():
+            np.testing.assert_allclose(pred[idx], expected, rtol=1e-3)
 
-    def test_cumsum_monotonic(self) -> None:
-        flight = pd.read_csv(EXAMPLE).iloc[::4].reset_index(drop=True)
-        out = FuelEstimatorPublic().estimate(flight, **MAPPING)
+    def test_mape_within_bound(self, out: pd.DataFrame) -> None:
+        pred = out["fuel_flow_kgh"].to_numpy()
+        real = out["FUEL_FLOW_KGH"].to_numpy() * ENGINE_NUM
+        mask = real > IN_FLIGHT_THRESHOLD_KGH  # in-flight points only
+        mape = float(np.mean(np.abs(pred[mask] - real[mask]) / real[mask]) * 100)
+        assert mape < MAX_MAPE_PCT
+
+    def test_cumsum_monotonic(self, out: pd.DataFrame) -> None:
         assert out["fuel_cumsum"].is_monotonic_increasing
