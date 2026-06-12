@@ -27,13 +27,8 @@ array of fuel flow in kg/s.
 
 ---
 
-The full API below — every public class, method and function with its signature and
-docstring — is rendered from the source by
-[mkdocstrings](https://mkdocstrings.github.io/).
-
-::: acropole.estimator
-    options:
-      show_root_heading: false
-      show_source: true
-      members_order: source
-      heading_level: 2
+The full API — every public class, method and function with its signature and
+docstring — is generated from the source by
+[mkdocstrings](https://mkdocstrings.github.io/) and browsable under the **API**
+section of this Reference, rendered automatically at build time from
+`src/acropole`.

@@ -49,13 +49,19 @@ nav:
     - Derivatives & second: howto/derivatives.md
     - From the command line: howto/cli.md
   - Reference:
-    - Python API: reference/index.md
+    - Overview: reference/index.md
     - CLI: reference/cli.md
+    - API: reference/api/
   - Explanation:
     - Architecture: explanation/architecture.md
 
 plugins:
   - search
+  - gen-files:
+      scripts:
+        - docs/gen_ref_pages.py
+  - literate-nav:
+      nav_file: SUMMARY.md
   - mkdocstrings:
       handlers:
         python:
