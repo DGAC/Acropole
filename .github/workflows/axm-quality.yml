@@ -1,0 +1,103 @@
+name: axm-quality
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  quality:
+    name: AXM Audit + Init + Badges
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v7
+      - run: uv python install 3.12
+      - run: uv sync --all-groups
+
+      # ── Badge helpers ──────────────────────────────────────────────
+      - name: Define badge helpers
+        id: helpers
+        run: |
+          cat > /tmp/badge-helpers.sh << 'HELPERS'
+          score_color() {
+            local SCORE=$1
+            if [ "$SCORE" -ge 95 ]; then echo "brightgreen"
+            elif [ "$SCORE" -ge 80 ]; then echo "green"
+            elif [ "$SCORE" -ge 60 ]; then echo "yellow"
+            else echo "red"; fi
+          }
+
+          write_badge() {
+            local DIR=$1 NAME=$2 LABEL=$3 VALUE=$4 LOGO_FILE=${5:-}
+            mkdir -p "$DIR"
+            local SCORE_INT=$(python3 -c "print(int(float('${VALUE}')))")
+            local COLOR=$(score_color "$SCORE_INT")
+            if [ -n "$LOGO_FILE" ] && [ -f "$LOGO_FILE" ]; then
+              local LOGO=$(cat "$LOGO_FILE")
+              jq -n --arg l "$LABEL" --arg v "$VALUE" --arg c "$COLOR" --arg logo "$LOGO" \
+                '{schemaVersion:1, label:$l, message:"\($v)%", color:$c, logoSvg:$logo, style:"flat"}' \
+                > "$DIR/$NAME.json"
+            else
+              jq -n --arg l "$LABEL" --arg v "$VALUE" --arg c "$COLOR" \
+                '{schemaVersion:1, label:$l, message:"\($v)%", color:$c, style:"flat"}' \
+                > "$DIR/$NAME.json"
+            fi
+          }
+          HELPERS
+
+          # Pre-fetch logos once
+          curl -fsSL https://raw.githubusercontent.com/axm-protocols/axm-audit/main/assets/logo.svg \
+            > /tmp/audit-logo.svg || true
+          curl -fsSL https://raw.githubusercontent.com/axm-protocols/axm-init/main/assets/logo.svg \
+            > /tmp/init-logo.svg || true
+
+      # ── Tests with coverage ────────────────────────────────────────
+      - name: Run tests with coverage
+        id: coverage
+        run: |
+          source /tmp/badge-helpers.sh
+          mkdir -p _publish/badges
+
+          uv run pytest --cov --cov-report=json:coverage.json --no-cov-on-fail -q || true
+
+          COV=$(jq '.totals.percent_covered_display' coverage.json | tr -d '"')
+          echo "coverage=$COV" >> "$GITHUB_OUTPUT"
+          write_badge "_publish/badges" "coverage" "coverage" "$COV"
+          echo "📊 Coverage: ${COV}%"
+
+      # ── AXM Audit ─────────────────────────────────────────────────
+      - name: Run AXM Audit
+        id: audit
+        run: |
+          source /tmp/badge-helpers.sh
+          RESULT=$(uvx axm-audit audit . --json) || true
+          SCORE=$(echo "$RESULT" | jq '.score')
+          echo "score=$SCORE" >> "$GITHUB_OUTPUT"
+          write_badge "_publish/badges" "axm-audit" "axm-audit" "$SCORE" /tmp/audit-logo.svg
+          echo "📋 AXM Audit: $SCORE/100"
+
+      # ── AXM Init ──────────────────────────────────────────────────
+      - name: Run AXM Init Check
+        id: check
+        run: |
+          source /tmp/badge-helpers.sh
+          RESULT=$(uvx axm-init check . --json) || true
+          SCORE=$(echo "$RESULT" | jq '.score')
+          echo "score=$SCORE" >> "$GITHUB_OUTPUT"
+          write_badge "_publish/badges" "axm-init" "axm-init" "$SCORE" /tmp/init-logo.svg
+          echo "📋 AXM Init: $SCORE/100"
+
+      # ── Push badges ────────────────────────────────────────────────
+      - name: Push badges to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./_publish
+          keep_files: true
+          commit_message: "ci: audit=${{ steps.audit.outputs.score }} init=${{ steps.check.outputs.score }} cov=${{ steps.coverage.outputs.coverage }}%"

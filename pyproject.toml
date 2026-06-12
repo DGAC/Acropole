@@ -1,37 +1,199 @@
 [project]
 name = "acropole"
-version = "1.0.0"
 description = "Open-source library to predict aircraft fuel flow from trajectory data using machine learning models"
 readme = "README.md"
 license = { text = "GNU Affero General Public License v3.0" }
 authors = [
     { name = "Gabriel JARRY", email = "gabriel.jarry@aviation-civile.gouv.fr" },
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.12"
+dynamic = ["version"]
 dependencies = [
-    "scipy>=1.13",
-    "joblib>=1.4",
-    "pandas>=2.2",
-    "scikit-learn>=1.4",
     "numpy>=1.26",
+    "polars>=1.0",
     "onnxruntime>=1.17",
 ]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+    "Typing :: Typed",
+]
+
+[project.optional-dependencies]
+pandas = ["pandas>=2.2"]
 
 [project.urls]
 Homepage = "https://github.com/DGAC/Acropole/"
+Documentation = "https://DGAC.github.io/Acropole/"
 Repository = "https://github.com/DGAC/Acropole/"
+Issues = "https://github.com/DGAC/Acropole/issues"
+Changelog = "https://github.com/DGAC/Acropole/releases"
+
+[dependency-groups]
+dev = [
+    "pandas>=2.2",
+    "pyarrow>=15",
+    "pytest>=8",
+    "pytest-cov>=5",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "pre-commit>=4.0",
+    "pip-audit>=2.0",
+    "pandas-stubs>=3.0.3.260530",
+    "bandit>=1.9.4",
+]
+docs = [
+    "mkdocs-material>=9.0",
+    "mkdocstrings[python]>=0.27",
+]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/acropole/_version.py"
+
 [tool.hatch.build.targets.wheel]
-packages = ["acropole"]
+packages = ["src/acropole"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"docs/index.md" = "acropole/docs/index.md"
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "/acropole",
+    "/src",
     "/tests",
+    "/examples",
+    "/docs",
     "/LICENSE",
     "/README.md",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--import-mode=importlib",
+    "--cov=acropole",
+    "--cov-report=term-missing",
+]
+filterwarnings = ["error"]
+markers = [
+    "integration: tests that load the packaged model and example data",
+    "e2e: end-to-end / CLI tests",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["acropole"]
+relative_files = true
+omit = ["*/_version.py"]
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "BLE", "C4", "C901", "S", "PLR", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "N802"]  # asserts + non-snake test method names
+
+[tool.ruff.lint.isort]
+known-first-party = ["acropole"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pylint]
+# Physical fuel model: estimate()/_derivatives legitimately take many per-sample
+# feature arrays (groundspeed, altitude, mass, second, d_*). 11 covers them.
+max-args = 11
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+pretty = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+no_implicit_optional = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = ["onnxruntime.*"]
+ignore_missing_imports = true
+
+[tool.deptry]
+# pandas is an optional extra (pandas-in/pandas-out path); the lib itself runs
+# on polars. Declared so deptry doesn't flag it as a transitive misuse.
+known_first_party = ["acropole"]
+extend_exclude = ["examples", "tests"]
+
+[tool.deptry.per_rule_ignores]
+# pandas is reachable only when the user passes a pandas DataFrame; it lives in
+# the optional [pandas] extra, not the core deps.
+DEP001 = []
+DEP004 = ["pandas"]
+
+[tool.git-cliff.changelog]
+header = """
+# Changelog
+
+All notable changes to this project will be documented in this file.
+"""
+body = """
+{% if version %}\
+    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+    ## [Unreleased]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | striptags | trim | upper_first }}
+    {% for commit in commits %}
+        - {{ commit.message | upper_first }}\
+    {% endfor %}
+{% endfor %}
+"""
+trim = true
+
+[tool.git-cliff.git]
+conventional_commits = true
+filter_unconventional = true
+commit_parsers = [
+    { message = "^chore", skip = true },
+    { message = "^ci", skip = true },
+    { message = "^feat", group = "🚀 Features" },
+    { message = "^fix", group = "🐛 Bug Fixes" },
+    { message = "^doc", group = "📚 Documentation" },
+    { message = "^perf", group = "⚡ Performance" },
+    { message = "^refactor", group = "🔧 Refactor" },
+    { message = "^test", group = "🧪 Tests" },
+]
+tag_pattern = "v[0-9].*"
