@@ -1,0 +1,86 @@
+site_name: Acropole
+site_description: Predict aircraft fuel flow from trajectory data
+site_url: https://DGAC.github.io/Acropole
+repo_url: https://github.com/DGAC/Acropole
+repo_name: DGAC/Acropole
+copyright: Copyright &copy; 2026 Gabriel JARRY
+
+theme:
+  name: material
+  logo: assets/logo.png
+  favicon: assets/logo.png
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Home: index.md
+  - Tutorials:
+    - Getting Started: tutorials/getting-started.md
+  - How-To Guides:
+    - Overview: howto/index.md
+    - Analyse a complete flight: howto/analyse-a-flight.md
+    - Map your own columns: howto/columns-mapping.md
+    - Multi-aircraft frames: howto/multi-aircraft.md
+    - Derivatives & second: howto/derivatives.md
+    - From the command line: howto/cli.md
+  - Reference:
+    - Python API: reference/index.md
+    - CLI: reference/cli.md
+  - Explanation:
+    - Architecture: explanation/architecture.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - src
+          options:
+            docstring_style: google
+            show_root_heading: true
+            show_root_full_path: false
+            heading_level: 3
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+  - tables

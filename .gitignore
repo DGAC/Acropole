@@ -66,3 +66,11 @@ target/
 .venv
 env/
 venv/
+
+# Jupyter
+.ipynb_checkpoints/
+_version.py
+site/
+coverage_html/
+.ruff_cache/
+.venv/
