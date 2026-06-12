@@ -81,35 +81,25 @@ class AircraftFuelEstimator:
     def __init__(
         self,
         typecode: str,
-        aircraft_params_path: Annotated[
-            str | None, "CSV path; None -> package data"
-        ] = None,
+        aircraft_params_path: Annotated[str | None, "CSV path; None -> package data"] = None,
         model_path: Annotated[str | None, "ONNX path; None -> package data"] = None,
         dtype: Annotated[Any, "intermediate numpy precision"] = np.float64,
     ) -> None:
         if aircraft_params_path is None:
-            aircraft_params_path = str(
-                files("acropole").joinpath("data/aircraft_params.csv")
-            )
+            aircraft_params_path = str(files("acropole").joinpath("data/aircraft_params.csv"))
         params = pl.read_csv(aircraft_params_path)
         row = params.filter(pl.col("ACFT_ICAO_TYPE") == typecode)
         if row.is_empty():
             raise ValueError(f"Aircraft type {typecode!r} not in aircraft_params")
 
         if model_path is None:
-            model_path = str(
-                files("acropole").joinpath("models/acropole_fuel_model.onnx")
-            )
-        session = ort.InferenceSession(
-            str(model_path), providers=["CPUExecutionProvider"]
-        )
+            model_path = str(files("acropole").joinpath("models/acropole_fuel_model.onnx"))
+        session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
 
         self._init_from(typecode, row.to_dicts()[0], session, np.dtype(dtype))
 
     @classmethod
-    def _from_shared(
-        cls, estimator: FuelEstimator, typecode: str
-    ) -> AircraftFuelEstimator:
+    def _from_shared(cls, estimator: FuelEstimator, typecode: str) -> AircraftFuelEstimator:
         """Build bound to ``typecode`` reusing ``estimator``'s session/params (no reload)."""
         params = estimator._params_by_type.get(typecode)
         if params is None:
@@ -187,19 +177,11 @@ class AircraftFuelEstimator:
         if normalized.dtype != np.float32:
             normalized = normalized.astype(np.float32)
 
-        values = self.session.run([self._output_name], {self._input_name: normalized})[
-            0
-        ]
-        single = (
-            values.squeeze(axis=-1)
-            if values.ndim == _MODEL_OUTPUT_NDIM
-            else values.ravel()
-        )
+        values = self.session.run([self._output_name], {self._input_name: normalized})[0]
+        single = values.squeeze(axis=-1) if values.ndim == _MODEL_OUTPUT_NDIM else values.ravel()
         return np.asarray(single * self._fuel_scale)
 
-    def _mass_norm(
-        self, mass: np.ndarray | None, n: int, dtype: np.dtype
-    ) -> np.ndarray:
+    def _mass_norm(self, mass: np.ndarray | None, n: int, dtype: np.dtype) -> np.ndarray:
         if mass is None:
             return np.full(n, self.DEFAULT_MASS, dtype=dtype)
         if self._mass_range == 0:
@@ -209,9 +191,7 @@ class AircraftFuelEstimator:
                 stacklevel=2,
             )
             return np.full(n, np.nan, dtype=dtype)
-        out = (
-            np.asarray(mass, dtype=dtype) - self._ope_empty_weight
-        ) / self._mass_range
+        out = (np.asarray(mass, dtype=dtype) - self._ope_empty_weight) / self._mass_range
         return np.asarray(out)
 
     def _derivatives(
@@ -277,26 +257,18 @@ class FuelEstimator:
 
     def __init__(
         self,
-        aircraft_params_path: Annotated[
-            str | None, "CSV path; None -> package data"
-        ] = None,
+        aircraft_params_path: Annotated[str | None, "CSV path; None -> package data"] = None,
         model_path: Annotated[str | None, "ONNX path; None -> package data"] = None,
         dtype: Annotated[Any, "intermediate numpy precision"] = np.float64,
     ) -> None:
         if aircraft_params_path is None:
-            aircraft_params_path = str(
-                files("acropole").joinpath("data/aircraft_params.csv")
-            )
+            aircraft_params_path = str(files("acropole").joinpath("data/aircraft_params.csv"))
         params = pl.read_csv(aircraft_params_path)
         self._params_by_type = {row["ACFT_ICAO_TYPE"]: row for row in params.to_dicts()}
 
         if model_path is None:
-            model_path = str(
-                files("acropole").joinpath("models/acropole_fuel_model.onnx")
-            )
-        self.session = ort.InferenceSession(
-            str(model_path), providers=["CPUExecutionProvider"]
-        )
+            model_path = str(files("acropole").joinpath("models/acropole_fuel_model.onnx"))
+        self.session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
         self.dtype = np.dtype(dtype)
 
     def for_aircraft(self, typecode: str) -> AircraftFuelEstimator:
@@ -357,14 +329,10 @@ class FuelEstimator:
         second_col = col["second"]
         if second_col is not None:
             sec = df[second_col].to_numpy().astype(self.dtype)
-            out = out.with_columns(
-                pl.Series("fuel_cumsum", np.cumsum(fuel_flow * diff_bfill(sec)))
-            )
+            out = out.with_columns(pl.Series("fuel_cumsum", np.cumsum(fuel_flow * diff_bfill(sec))))
         return out.to_pandas() if was_pandas else out
 
-    def _predict_grouped(
-        self, df: pl.DataFrame, col: dict[str, str | None]
-    ) -> np.ndarray:
+    def _predict_grouped(self, df: pl.DataFrame, col: dict[str, str | None]) -> np.ndarray:
         """Run inference per typecode group, scattering results back to row order."""
         typecode_col = col["typecode"] or "typecode"
         result = np.full(df.height, np.nan, dtype=self.dtype)
@@ -375,9 +343,7 @@ class FuelEstimator:
                 warnings.warn(f"Aircraft type {typecode!r} not supported", stacklevel=3)
                 continue  # leave NaN for unsupported rows
             sub = df.filter(pl.lit(mask))
-            result[mask] = self.for_aircraft(typecode).estimate(
-                **self._extract(sub, col)
-            )
+            result[mask] = self.for_aircraft(typecode).estimate(**self._extract(sub, col))
         return result
 
     def _extract(self, sub: pl.DataFrame, col: dict[str, str | None]) -> dict[str, Any]:
