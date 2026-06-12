@@ -9,10 +9,12 @@ authors = [
 requires-python = ">=3.12"
 dynamic = ["version"]
 dependencies = [
-    "numpy>=2.4.6",
+    "numpy>=2.0",
     "polars>=1.0",
-    "onnxruntime>=1.26.0",
-    "cyclopts>=4.18.0",
+    # onnxruntime < 1.19.2 was built against numpy 1.x and fails to import
+    # under numpy 2 (_ARRAY_API not found); 1.19.2 is the first numpy-2 build.
+    "onnxruntime>=1.19.2",
+    "cyclopts>=3.0",
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -56,6 +58,8 @@ dev = [
 docs = [
     "mkdocs-material>=9.0",
     "mkdocstrings[python]>=0.27",
+    "mkdocs-gen-files>=0.5",
+    "mkdocs-literate-nav>=0.6.3",
 ]
 
 [build-system]
