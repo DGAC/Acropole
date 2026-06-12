@@ -30,7 +30,10 @@ def _read(path: Path) -> pl.DataFrame:
         return pl.read_parquet(path)
     if suffix == ".csv":
         return pl.read_csv(path)
-    print(f"error: unsupported input format {suffix!r} (use .csv or .parquet)", file=sys.stderr)
+    print(
+        f"error: unsupported input format {suffix!r} (use .csv or .parquet)",
+        file=sys.stderr,
+    )
     raise SystemExit(1)
 
 
@@ -47,15 +50,25 @@ def estimate(
     *,
     out: Annotated[
         Path | None,
-        cyclopts.Parameter(help="Output path (.csv/.parquet); default: <flight>_fuel.<ext>"),
+        cyclopts.Parameter(
+            help="Output path (.csv/.parquet); default: <flight>_fuel.<ext>"
+        ),
     ] = None,
-    typecode: Annotated[str, cyclopts.Parameter(help="Aircraft type column")] = "typecode",
-    groundspeed: Annotated[str, cyclopts.Parameter(help="Groundspeed column (kt)")] = "groundspeed",
-    altitude: Annotated[str, cyclopts.Parameter(help="Altitude column (ft)")] = "altitude",
+    typecode: Annotated[
+        str, cyclopts.Parameter(help="Aircraft type column")
+    ] = "typecode",
+    groundspeed: Annotated[
+        str, cyclopts.Parameter(help="Groundspeed column (kt)")
+    ] = "groundspeed",
+    altitude: Annotated[
+        str, cyclopts.Parameter(help="Altitude column (ft)")
+    ] = "altitude",
     vertical_rate: Annotated[
         str, cyclopts.Parameter(help="Vertical rate column (ft/min)")
     ] = "vertical_rate",
-    airspeed: Annotated[str, cyclopts.Parameter(help="Airspeed column (kt)")] = "airspeed",
+    airspeed: Annotated[
+        str, cyclopts.Parameter(help="Airspeed column (kt)")
+    ] = "airspeed",
     mass: Annotated[str, cyclopts.Parameter(help="Mass column (kg)")] = "mass",
     second: Annotated[
         str | None, cyclopts.Parameter(help="Timestamp column (s); enables derivatives")
@@ -83,10 +96,16 @@ def estimate(
         mapping["second"] = second
 
     try:
-        result = FuelEstimator().estimate(frame, **mapping)
+        estimated = FuelEstimator().estimate(frame, **mapping)
     except (ValueError, KeyError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
+
+    # estimate() echoes its input frame type; _read always yields polars, so the
+    # result is polars too. Narrow defensively (and convert pandas if it ever isn't).
+    result = (
+        estimated if isinstance(estimated, pl.DataFrame) else pl.from_pandas(estimated)
+    )
 
     if out is None:
         out = flight.with_name(f"{flight.stem}_fuel{flight.suffix}")
