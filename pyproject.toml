@@ -12,6 +12,7 @@ dependencies = [
     "numpy>=1.26",
     "polars>=1.0",
     "onnxruntime>=1.17",
+    "cyclopts>=4.5",
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -26,6 +27,9 @@ classifiers = [
 
 [project.optional-dependencies]
 pandas = ["pandas>=2.2"]
+
+[project.scripts]
+acropole = "acropole.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/DGAC/Acropole/"
@@ -98,7 +102,9 @@ markers = [
 branch = true
 source = ["acropole"]
 relative_files = true
-omit = ["*/_version.py"]
+# cli.py is exercised black-box via subprocess (tests/e2e), which coverage.py
+# cannot instrument; it is verified by the e2e suite, not line coverage.
+omit = ["*/_version.py", "*/cli.py"]
 
 [tool.coverage.xml]
 output = "coverage.xml"
@@ -120,6 +126,7 @@ select = ["E", "F", "I", "N", "UP", "B", "BLE", "C4", "C901", "S", "PLR", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "N802"]  # asserts + non-snake test method names
+"tests/e2e/**" = ["S101", "N802", "S603"]  # + subprocess calls are intentional
 
 [tool.ruff.lint.isort]
 known-first-party = ["acropole"]
@@ -131,6 +138,11 @@ max-complexity = 10
 # Physical fuel model: estimate()/_derivatives legitimately take many per-sample
 # feature arrays (groundspeed, altitude, mass, second, d_*). 11 covers them.
 max-args = 11
+
+[tool.axm-audit.mirror]
+# cli.py is a thin I/O façade over FuelEstimator; it is exercised black-box by
+# the e2e suite (tests/e2e/test_acropole_cli.py), not by a unit mirror.
+exempt_paths = ["cli.py"]
 
 [tool.mypy]
 python_version = "3.12"

@@ -245,11 +245,14 @@ class TestEdgeCases:
         np.testing.assert_allclose(f32, f64, rtol=1e-3)
 
     def test_typecode_is_case_sensitive(self) -> None:
-        # lowercase typecode is not in the table -> warns + NaN (documents behavior)
-        flight = _flight(typecode="a320")
-        with pytest.warns(UserWarning, match="not supported"):
-            out = FuelEstimator().estimate(flight)
-        assert out["fuel_flow"].isna().all()
+        # Same aircraft, two casings: uppercase matches the table, lowercase does
+        # not. Contrasting the two is the point — typecodes are case-sensitive.
+        fe = FuelEstimator()
+        upper = fe.estimate(_flight(typecode="A320"))["fuel_flow"].to_numpy()
+        assert np.isfinite(upper).all()  # "A320" is scored
+        with pytest.warns(UserWarning):
+            lower = fe.estimate(_flight(typecode="a320"))["fuel_flow"].to_numpy()
+        assert np.isnan(lower).all()  # "a320" is not
 
 
 @pytest.mark.skipif(not EXAMPLE.exists(), reason="example_flight.csv not packaged")
