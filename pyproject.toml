@@ -41,7 +41,7 @@ Changelog = "https://github.com/DGAC/Acropole/releases"
 [dependency-groups]
 dev = [
     "pandas>=2.2",
-    "pyarrow>=15",
+    "pyarrow>=24.0.0",
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
     "ruff>=0.15.17",
