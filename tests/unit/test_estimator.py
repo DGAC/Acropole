@@ -135,6 +135,84 @@ class TestEstimateContract:
         assert not np.allclose(ff_a, ff_b)
 
 
+class TestSecondPresenceTriggers:
+    """A ``second`` column is detected by presence, no kwarg required (#15)."""
+
+    def test_no_kwarg_present_second_adds_cumsum_pandas(self) -> None:
+        # AC1: user case — second column present, no kwarg -> fuel_cumsum.
+        out = cast("pd.DataFrame", FuelEstimator().estimate(_flight(second=True)))
+        assert "fuel_cumsum" in out.columns
+        assert out["fuel_cumsum"].is_monotonic_increasing
+
+    def test_no_kwarg_present_second_adds_cumsum_polars(self) -> None:
+        # AC1 (polars path): same presence-trigger on a polars frame.
+        out = cast(
+            "pl.DataFrame",
+            FuelEstimator().estimate(pl.from_pandas(_flight(second=True))),
+        )
+        assert "fuel_cumsum" in out.columns
+        cumsum = out["fuel_cumsum"].to_numpy()
+        assert np.all(np.diff(cumsum) >= 0)
+
+    def test_fuel_flow_parity_with_and_without_kwarg_pandas(self) -> None:
+        # AC2: presence alone must drive the real derivatives -> identical
+        # fuel_flow whether or not the redundant second="second" kwarg is passed.
+        flight = _flight(second=True)
+        implicit = cast("pd.DataFrame", FuelEstimator().estimate(flight))
+        explicit = cast(
+            "pd.DataFrame", FuelEstimator().estimate(flight, second="second")
+        )
+        np.testing.assert_array_equal(
+            implicit["fuel_flow"].to_numpy(), explicit["fuel_flow"].to_numpy()
+        )
+
+    def test_fuel_flow_parity_with_and_without_kwarg_polars(self) -> None:
+        # AC2 (polars path): same parity on a polars frame.
+        flight = pl.from_pandas(_flight(second=True))
+        implicit = cast("pl.DataFrame", FuelEstimator().estimate(flight))
+        explicit = cast(
+            "pl.DataFrame", FuelEstimator().estimate(flight, second="second")
+        )
+        np.testing.assert_array_equal(
+            implicit["fuel_flow"].to_numpy(), explicit["fuel_flow"].to_numpy()
+        )
+
+    def test_present_second_uses_real_derivatives_not_quasi_steady(self) -> None:
+        # AC2: a present second column must change the prediction vs the
+        # no-second quasi-steady fallback (proves derivatives actually flow in).
+        with_second = cast(
+            "pd.DataFrame", FuelEstimator().estimate(_flight(second=True))
+        )
+        without_second = cast(
+            "pd.DataFrame", FuelEstimator().estimate(_flight(second=False))
+        )
+        assert not np.allclose(
+            with_second["fuel_flow"].to_numpy(),
+            without_second["fuel_flow"].to_numpy(),
+        )
+
+    def test_no_second_column_works_without_cumsum(self) -> None:
+        # AC3: a frame with no second column still works -> no fuel_cumsum,
+        # finite fuel_flow, no error (unchanged behavior).
+        out = cast("pd.DataFrame", FuelEstimator().estimate(_flight(second=False)))
+        assert "fuel_cumsum" not in out.columns
+        assert np.isfinite(out["fuel_flow"].to_numpy()).all()
+
+    def test_explicit_custom_second_column_name(self) -> None:
+        # AC4: an explicit kwarg still maps a non-standard column name.
+        flight = _flight(second=True).rename(columns={"second": "elapsed_s"})
+        out = cast("pd.DataFrame", FuelEstimator().estimate(flight, second="elapsed_s"))
+        assert "fuel_cumsum" in out.columns
+        assert out["fuel_cumsum"].is_monotonic_increasing
+
+    def test_custom_named_second_column_without_kwarg_is_ignored(self) -> None:
+        # AC4 (negative): a non-standard column name is NOT auto-detected; it is
+        # only the default "second" name (or an explicit kwarg) that triggers.
+        flight = _flight(second=True).rename(columns={"second": "elapsed_s"})
+        out = cast("pd.DataFrame", FuelEstimator().estimate(flight))
+        assert "fuel_cumsum" not in out.columns
+
+
 class TestAircraftFuelEstimator:
     def test_unknown_typecode_raises(self) -> None:
         with pytest.raises(ValueError, match="not in aircraft_params"):

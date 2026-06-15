@@ -8,7 +8,8 @@ order of control.
 
 This is the recommended path. Provide a `second` column (elapsed seconds per sample) and
 Acropole computes each derivative as a backward difference divided by the time step
-(`Δfeature / Δt`):
+(`Δfeature / Δt`). The column is detected by **presence** (name `second`, or a custom name
+passed as `second="..."`) — no keyword argument is needed when it is already named `second`:
 
 ```python
 flight = pd.DataFrame({
@@ -22,7 +23,8 @@ flight = pd.DataFrame({
 result = fe.estimate(flight)   # also produces fuel_cumsum
 ```
 
-This path is the only one that also emits the `fuel_cumsum` column.
+This path is the only one that also emits the `fuel_cumsum` column — emitted whenever the
+`second` column is present.
 
 !!! note "Duplicate timestamps"
     Where two consecutive samples share a timestamp (`Δt == 0`), the derivative is set to

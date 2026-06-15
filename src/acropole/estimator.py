@@ -283,9 +283,11 @@ class FuelEstimator:
     """Data pipeline for trajectory fuel-flow enhancement.
 
     Accepts a pandas **or** polars DataFrame and returns the same type, adding
-    ``fuel_flow`` (kg/s), ``fuel_flow_kgh`` (kg/h) and — when ``second`` is given
-    — ``fuel_cumsum`` (kg). Frames mixing several aircraft typecodes are handled
-    per typecode (each row scored with its own aircraft parameters).
+    ``fuel_flow`` (kg/s), ``fuel_flow_kgh`` (kg/h) and — when a ``second``
+    column is present — ``fuel_cumsum`` (kg). The ``second`` column (like the
+    other optional features) is triggered by its presence in the frame, no
+    keyword argument required. Frames mixing several aircraft typecodes are
+    handled per typecode (each row scored with its own aircraft parameters).
     """
 
     DEFAULT_MASS = _DEFAULT_MASS
@@ -324,9 +326,16 @@ class FuelEstimator:
     ) -> pd.DataFrame | pl.DataFrame:
         """Estimate fuel flow for ``flight``; see class docstring for columns.
 
-        Column-name overrides via kwargs: ``typecode``, ``groundspeed``,
-        ``altitude``, ``vertical_rate``, ``airspeed``, ``mass``, ``second``,
-        ``d_altitude``, ``d_groundspeed``, ``d_airspeed``.
+        Optional features are triggered by the **presence of their column** in
+        ``flight`` (matched by name): when a ``second`` column is present the
+        real time-derivatives are used and a ``fuel_cumsum`` column is added; an
+        absent ``second`` column falls back to quasi-steady derivatives and adds
+        no ``fuel_cumsum`` (no kwarg required either way).
+
+        Column-name overrides via kwargs map a non-standard column name onto a
+        feature: ``typecode``, ``groundspeed``, ``altitude``, ``vertical_rate``,
+        ``airspeed``, ``mass``, ``second``, ``d_altitude``, ``d_groundspeed``,
+        ``d_airspeed``.
         """
         df = flight if isinstance(flight, pl.DataFrame) else pl.from_pandas(flight)
         was_pandas = not isinstance(flight, pl.DataFrame)
@@ -346,12 +355,11 @@ class FuelEstimator:
                 "d_airspeed",
             )
         }
-        col["second"] = kwargs.get("second", None)
 
         for required in ("typecode", "groundspeed", "altitude", "vertical_rate"):
             if col[required] not in df.columns:
                 raise ValueError(f"Column {col[required]!r} not found")
-        if col["second"] is not None and df[col["second"]].dtype not in (
+        if col["second"] in df.columns and df[col["second"]].dtype not in (
             pl.Float32,
             pl.Float64,
             pl.Int8,
@@ -372,7 +380,7 @@ class FuelEstimator:
             pl.Series("fuel_flow_kgh", fuel_flow * 3600.0),
         )
         second_col = col["second"]
-        if second_col is not None:
+        if second_col in df.columns:
             sec = df[second_col].to_numpy().astype(self.dtype)
             out = out.with_columns(
                 pl.Series("fuel_cumsum", np.cumsum(fuel_flow * diff_bfill(sec)))

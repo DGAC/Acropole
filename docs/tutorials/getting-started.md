@@ -62,9 +62,11 @@ a polars frame and you get a polars frame back.
 
 ## Step 2 — Add optional features
 
-Supplying `airspeed`, `mass` and especially `second` improves the estimate. The `second`
-column (elapsed seconds) lets the model derive **accelerations** of the speeds and also
-produces a `fuel_cumsum` column (cumulative kg burned):
+Supplying `airspeed`, `mass` and especially `second` improves the estimate. Each optional
+feature is detected by the **presence of its column** in the frame (matched by name) — no
+keyword argument is needed. The `second` column (elapsed seconds) lets the model derive
+**accelerations** of the speeds and also produces a `fuel_cumsum` column (cumulative kg
+burned):
 
 ```python
 flight = pd.DataFrame({
@@ -72,12 +74,12 @@ flight = pd.DataFrame({
     "groundspeed": [400, 410, 420, 430],
     "altitude": [10000, 11000, 12000, 13000],
     "vertical_rate": [2000, 1500, 1000, 500],
-    "second": [0.0, 4.0, 8.0, 12.0],          # enables derivatives + fuel_cumsum
+    "second": [0.0, 4.0, 8.0, 12.0],          # present -> derivatives + fuel_cumsum
     "airspeed": [400, 410, 420, 430],
     "mass": [60000, 60000, 60000, 60000],
 })
 
-result = fe.estimate(flight)
+result = fe.estimate(flight)  # no kwarg needed: the `second` column triggers it
 print(result[["fuel_flow", "fuel_flow_kgh", "fuel_cumsum"]])
 ```
 
@@ -118,7 +120,7 @@ result = fe.estimate(
 |---|---|---|
 | `fuel_flow` | kg/s | Instantaneous fuel flow at each sample |
 | `fuel_flow_kgh` | kg/h | The same value scaled by 3600 (kg/s → kg/h) |
-| `fuel_cumsum` | kg | Cumulative fuel burned since the start (only when `second` is given) |
+| `fuel_cumsum` | kg | Cumulative fuel burned since the start (only when a `second` column is present) |
 
 A quick sanity check — total fuel burned and mean flow:
 

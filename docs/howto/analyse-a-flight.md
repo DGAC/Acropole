@@ -83,8 +83,9 @@ flight_fuel = fe.estimate(
 )
 ```
 
-`estimate` adds `fuel_flow` (kg/s), `fuel_flow_kgh` (kg/h) and — because
-`second` was given — `fuel_cumsum` (cumulative kg).
+`estimate` adds `fuel_flow` (kg/s), `fuel_flow_kgh` (kg/h) and — because a
+`second` column is present (here mapped from `FLIGHT_TIME`) — `fuel_cumsum`
+(cumulative kg).
 
 ### Compare to the measured fuel flow
 
