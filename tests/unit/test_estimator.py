@@ -363,8 +363,12 @@ class TestExampleFlight:
     either catches a drift a mere correlation check would silently pass.
     """
 
+    # @classmethod is required for a class-scoped fixture (pytest 10 removes the
+    # instance-method form). It must sit *below* @pytest.fixture — the reverse
+    # order silently makes the fixture undiscoverable.
     @pytest.fixture(scope="class")
-    def out(self) -> pd.DataFrame:
+    @classmethod
+    def out(cls) -> pd.DataFrame:
         flight = pd.read_csv(EXAMPLE).iloc[::4].reset_index(drop=True)
         result = FuelEstimator().estimate(flight, **MAPPING)
         result["FUEL_FLOW_KGH"] = flight["FUEL_FLOW_KGH"]
