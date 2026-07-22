@@ -1,26 +1,29 @@
 """Aircraft fuel-flow estimation from trajectory data via an ONNX model.
 
 Public API:
-    FuelEstimator         — DataFrame-in / DataFrame-out estimator (pandas or
-                            polars accepted; the input type is preserved on
-                            output). Dispatches per aircraft typecode internally.
+    FuelEstimator         — DataFrame-in / DataFrame-out estimator. Any frame
+                            narwhals supports (pandas, polars, pyarrow, …) is
+                            accepted and the input type is preserved on output.
+                            Dispatches per aircraft typecode internally.
     AircraftFuelEstimator — typecode-bound, numpy-only estimator (faster per call,
                             no per-call params lookup).
 """
 
 from __future__ import annotations
 
+import csv
 import warnings
 from importlib.resources import files
-from typing import TYPE_CHECKING, Annotated, cast
+from typing import Annotated, cast
 
+# narwhals' *stable* namespace, not the top-level one: acropole is a library that
+# gets installed next to arbitrary other packages, and stable.v1 is guaranteed not
+# to break across narwhals major versions. See https://narwhals-dev.github.io/narwhals/backcompat/
+import narwhals.stable.v1 as nw
 import numpy as np
 import numpy.typing as npt
 import onnxruntime as ort
-import polars as pl
-
-if TYPE_CHECKING:
-    import pandas as pd
+from narwhals.stable.v1.typing import IntoDataFrameT
 
 __all__ = ["AircraftFuelEstimator", "FuelEstimator"]
 
@@ -39,6 +42,33 @@ _DEFAULT_MASS = -1.0
 
 # ONNX model emits a 2-D (N, 1) tensor; squeeze the trailing singleton axis.
 _MODEL_OUTPUT_NDIM = 2
+
+# Columns of aircraft_params.csv the estimator reads, all numeric. The rest of
+# the table (ENGINE_ICAO, TYPE, WTC, …) is reference metadata we never score on.
+_PARAM_COLUMNS = (
+    "ENGINE_TYPE",
+    "SURFACE",
+    "MAX_OPE_ALTI",
+    "MAX_OPE_SPEED",
+    "OPE_EMPTY_WEIGHT",
+    "MAX_TO_WEIGHT",
+    "FUEL_FLOW_TO",
+    "ENGINE_NUM",
+)
+
+
+def _load_aircraft_params(path: str) -> dict[str, dict[str, float]]:
+    """Read the aircraft reference table into ``{typecode: {param: value}}``.
+
+    Parsed with the stdlib ``csv`` module rather than a dataframe backend: the
+    table is a ~30-row lookup consumed as plain dicts, so reading it through
+    polars/pandas would make a frame backend mandatory just to build a mapping.
+    """
+    with open(path, newline="", encoding="utf-8") as handle:
+        return {
+            row["ACFT_ICAO_TYPE"]: {name: float(row[name]) for name in _PARAM_COLUMNS}
+            for row in csv.DictReader(handle)
+        }
 
 
 def diff_bfill(arr: FloatArray) -> FloatArray:
@@ -97,9 +127,8 @@ class AircraftFuelEstimator:
             aircraft_params_path = str(
                 files("acropole").joinpath("data/aircraft_params.csv")
             )
-        params = pl.read_csv(aircraft_params_path)
-        row = params.filter(pl.col("ACFT_ICAO_TYPE") == typecode)
-        if row.is_empty():
+        row = _load_aircraft_params(aircraft_params_path).get(typecode)
+        if row is None:
             raise ValueError(f"Aircraft type {typecode!r} not in aircraft_params")
 
         if model_path is None:
@@ -110,9 +139,7 @@ class AircraftFuelEstimator:
             str(model_path), providers=["CPUExecutionProvider"]
         )
 
-        self._init_from(
-            typecode, row.to_dicts()[0], session, cast("FloatDType", np.dtype(dtype))
-        )
+        self._init_from(typecode, row, session, cast("FloatDType", np.dtype(dtype)))
 
     @classmethod
     def _from_shared(
@@ -129,7 +156,7 @@ class AircraftFuelEstimator:
     def _init_from(  # type: ignore[no-any-unimported]  # ort.InferenceSession: no stubs
         self,
         typecode: str,
-        params: dict[str, object],  # polars row: heterogeneous CSV values
+        params: dict[str, float],
         session: ort.InferenceSession,
         dtype: FloatDType,
     ) -> None:
@@ -139,21 +166,16 @@ class AircraftFuelEstimator:
         self._input_name = session.get_inputs()[0].name
         self._output_name = session.get_outputs()[0].name
 
-        # params holds a polars CSV row (dict[str, object]); the queried columns
-        # are numeric by construction, so the float coercions below are sound —
-        # the ignores silence object-operand noise, not a real type risk.
         to_dtype = dtype.type
-        self._engine_type = to_dtype(params["ENGINE_TYPE"])  # type: ignore[arg-type]
-        self._surface = to_dtype(params["SURFACE"])  # type: ignore[arg-type]
-        self._max_ope_alti = to_dtype(params["MAX_OPE_ALTI"])  # type: ignore[arg-type]
-        self._max_ope_speed = to_dtype(params["MAX_OPE_SPEED"])  # type: ignore[arg-type]
-        self._ope_empty_weight = to_dtype(params["OPE_EMPTY_WEIGHT"])  # type: ignore[arg-type]
+        self._engine_type = to_dtype(params["ENGINE_TYPE"])
+        self._surface = to_dtype(params["SURFACE"])
+        self._max_ope_alti = to_dtype(params["MAX_OPE_ALTI"])
+        self._max_ope_speed = to_dtype(params["MAX_OPE_SPEED"])
+        self._ope_empty_weight = to_dtype(params["OPE_EMPTY_WEIGHT"])
         self._mass_range = to_dtype(
-            params["MAX_TO_WEIGHT"] - params["OPE_EMPTY_WEIGHT"]  # type: ignore[operator]
+            params["MAX_TO_WEIGHT"] - params["OPE_EMPTY_WEIGHT"]
         )
-        self._fuel_scale = float(
-            params["FUEL_FLOW_TO"] * params["ENGINE_NUM"]  # type: ignore[operator]
-        )
+        self._fuel_scale = float(params["FUEL_FLOW_TO"] * params["ENGINE_NUM"])
 
         self._mins = np.array(_MINIMUMS, dtype=dtype)
         self._scale = np.array(_MAXIMUMS, dtype=dtype) - self._mins
@@ -282,7 +304,8 @@ class AircraftFuelEstimator:
 class FuelEstimator:
     """Data pipeline for trajectory fuel-flow enhancement.
 
-    Accepts a pandas **or** polars DataFrame and returns the same type, adding
+    Accepts any eager DataFrame narwhals supports (pandas, polars, pyarrow, …)
+    and returns the same type, adding
     ``fuel_flow`` (kg/s), ``fuel_flow_kgh`` (kg/h) and — when a ``second``
     column is present — ``fuel_cumsum`` (kg). The ``second`` column (like the
     other optional features) is triggered by its presence in the frame, no
@@ -304,8 +327,7 @@ class FuelEstimator:
             aircraft_params_path = str(
                 files("acropole").joinpath("data/aircraft_params.csv")
             )
-        params = pl.read_csv(aircraft_params_path)
-        self._params_by_type = {row["ACFT_ICAO_TYPE"]: row for row in params.to_dicts()}
+        self._params_by_type = _load_aircraft_params(aircraft_params_path)
 
         if model_path is None:
             model_path = str(
@@ -321,9 +343,7 @@ class FuelEstimator:
         this estimator's already-loaded ONNX session and parameters (no reload)."""
         return AircraftFuelEstimator._from_shared(self, typecode)
 
-    def estimate(
-        self, flight: pd.DataFrame | pl.DataFrame, **kwargs: str
-    ) -> pd.DataFrame | pl.DataFrame:
+    def estimate(self, flight: IntoDataFrameT, **kwargs: str) -> IntoDataFrameT:
         """Estimate fuel flow for ``flight``; see class docstring for columns.
 
         Optional features are triggered by the **presence of their column** in
@@ -337,10 +357,9 @@ class FuelEstimator:
         ``airspeed``, ``mass``, ``second``, ``d_altitude``, ``d_groundspeed``,
         ``d_airspeed``.
         """
-        df = flight if isinstance(flight, pl.DataFrame) else pl.from_pandas(flight)
-        was_pandas = not isinstance(flight, pl.DataFrame)
+        df = nw.from_native(flight, eager_only=True)
 
-        col: dict[str, str | None] = {
+        col: dict[str, str] = {
             name: kwargs.get(name, name)
             for name in (
                 "typecode",
@@ -359,57 +378,60 @@ class FuelEstimator:
         for required in ("typecode", "groundspeed", "altitude", "vertical_rate"):
             if col[required] not in df.columns:
                 raise ValueError(f"Column {col[required]!r} not found")
-        if col["second"] in df.columns and df[col["second"]].dtype not in (
-            pl.Float32,
-            pl.Float64,
-            pl.Int8,
-            pl.Int16,
-            pl.Int32,
-            pl.Int64,
-            pl.UInt8,
-            pl.UInt16,
-            pl.UInt32,
-            pl.UInt64,
-        ):
+        second_col = col["second"]
+        if second_col in df.columns and not df[second_col].dtype.is_numeric():
             raise ValueError("column for second must be float or integer")
 
         fuel_flow = self._predict_grouped(df, col)
 
+        backend = df.implementation
         out = df.with_columns(
-            pl.Series("fuel_flow", fuel_flow),
-            pl.Series("fuel_flow_kgh", fuel_flow * 3600.0),
+            nw.new_series("fuel_flow", fuel_flow, backend=backend),
+            nw.new_series("fuel_flow_kgh", fuel_flow * 3600.0, backend=backend),
         )
-        second_col = col["second"]
         if second_col in df.columns:
             sec = df[second_col].to_numpy().astype(self.dtype)
             out = out.with_columns(
-                pl.Series("fuel_cumsum", np.cumsum(fuel_flow * diff_bfill(sec)))
+                nw.new_series(
+                    "fuel_cumsum",
+                    np.cumsum(fuel_flow * diff_bfill(sec)),
+                    backend=backend,
+                )
             )
-        return out.to_pandas() if was_pandas else out
+        return out.to_native()
 
     def _predict_grouped(
-        self, df: pl.DataFrame, col: dict[str, str | None]
+        self, df: nw.DataFrame[IntoDataFrameT], col: dict[str, str]
     ) -> FloatArray:
-        """Run inference per typecode group, scattering results back to row order."""
-        typecode_col = col["typecode"] or "typecode"
-        result = np.full(df.height, np.nan, dtype=self.dtype)
-        typecodes = df[typecode_col]
-        for typecode in typecodes.unique(maintain_order=True).to_list():
-            mask = (typecodes == typecode).to_numpy()
+        """Run inference per typecode group, scattering results back to row order.
+
+        Feature columns are pulled out of the frame once, up front; the per-group
+        split is then a numpy mask. That keeps the backend-specific work to a
+        single conversion per column instead of one frame filter per typecode.
+        """
+        typecode_col = col["typecode"]
+        typecodes = df[typecode_col].to_numpy()
+        required, optional = self._extract(df, col)
+
+        result = np.full(len(df), np.nan, dtype=self.dtype)
+        for typecode in dict.fromkeys(typecodes.tolist()):  # unique, order-preserving
             if typecode not in self._params_by_type:
                 warnings.warn(f"Aircraft type {typecode!r} not supported", stacklevel=3)
                 continue  # leave NaN for unsupported rows
-            sub = df.filter(pl.lit(mask))
-            groundspeed, altitude, vertical_rate, optional = self._extract(sub, col)
+            mask = typecodes == typecode
+            groundspeed, altitude, vertical_rate = (arr[mask] for arr in required)
             result[mask] = self.for_aircraft(typecode).estimate(
-                groundspeed, altitude, vertical_rate, **optional
+                groundspeed,
+                altitude,
+                vertical_rate,
+                **{k: None if v is None else v[mask] for k, v in optional.items()},
             )
         return result
 
     def _extract(
-        self, sub: pl.DataFrame, col: dict[str, str | None]
-    ) -> tuple[FloatArray, FloatArray, FloatArray, dict[str, FloatArray | None]]:
-        """Split a typecode group into its required arrays and optional kwargs.
+        self, df: nw.DataFrame[IntoDataFrameT], col: dict[str, str]
+    ) -> tuple[tuple[FloatArray, FloatArray, FloatArray], dict[str, FloatArray | None]]:
+        """Split the frame into its required feature arrays and optional kwargs.
 
         The three required columns are guaranteed present by ``estimate``'s
         upfront validation, so they are returned non-optional; the rest become
@@ -421,20 +443,19 @@ class FuelEstimator:
         def arr(key: str) -> FloatArray | None:
             """Numpy array for column ``col[key]`` if present, else None."""
             name = col[key]
-            if name is None or name not in sub.columns:
+            if name not in df.columns:
                 return None
-            return sub[name].to_numpy().astype(dtype)
+            return df[name].to_numpy().astype(dtype)
 
         def required(key: str) -> FloatArray:
             """Array for a column ``estimate`` already validated as present."""
-            name = col[key]
-            if name is None:  # unreachable: validated in estimate() upfront
-                raise ValueError(f"Column for {key!r} not found")
-            return sub[name].to_numpy().astype(dtype)
+            return df[col[key]].to_numpy().astype(dtype)
 
-        groundspeed = required("groundspeed")
-        altitude = required("altitude")
-        vertical_rate = required("vertical_rate")
+        features = (
+            required("groundspeed"),
+            required("altitude"),
+            required("vertical_rate"),
+        )
         optional = {
             "airspeed": arr("airspeed"),
             "mass": arr("mass"),
@@ -443,4 +464,4 @@ class FuelEstimator:
             "d_groundspeed": arr("d_groundspeed"),
             "d_airspeed": arr("d_airspeed"),
         }
-        return groundspeed, altitude, vertical_rate, optional
+        return features, optional

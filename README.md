@@ -21,10 +21,11 @@
 
 `acropole` predicts the **fuel flow of aircraft** (kg/s, kg/h and cumulative kg) from
 trajectory data — groundspeed, altitude and vertical rate — using a portable **ONNX**
-model trained on Quick Access Recorder (QAR) data. It accepts a **pandas or polars**
-`DataFrame`, dispatches per aircraft typecode, and returns the same frame enriched with
-fuel-flow columns. The runtime depends only on numpy + polars + onnxruntime — no heavy
-ML framework.
+model trained on Quick Access Recorder (QAR) data. It accepts **any DataFrame
+[narwhals](https://narwhals-dev.github.io/narwhals/) supports** — pandas, polars,
+pyarrow and more — dispatches per aircraft typecode, and returns the same frame
+enriched with fuel-flow columns. The runtime depends only on numpy + narwhals +
+onnxruntime — no heavy ML framework, and no frame library of its own.
 
 📖 **[Full documentation](https://DGAC.github.io/Acropole/)**
 
@@ -32,7 +33,7 @@ ML framework.
 
 - ⛽ **Fuel-flow prediction** — per-sample `fuel_flow` (kg/s), `fuel_flow_kgh` (kg/h) and `fuel_cumsum` (kg) from a flight trajectory
 - ✈️ **Multi-aircraft** — frames mixing several typecodes are scored per typecode, each row with its own aircraft parameters
-- 🐼 **pandas *and* polars** — `estimate()` accepts either and returns the same type; the engine runs on polars internally
+- 🐼 **Bring your own DataFrame** — `estimate()` takes pandas, polars, pyarrow (anything narwhals supports) and returns the same type; no frame library is a hard dependency
 - 🚀 **Fast ONNX runtime** — migrated from TensorFlow, **2–4.8× faster** depending on batch size, numerical parity validated to **1e-6**; no TensorFlow dependency
 - 📈 **Temporal derivatives** — supply a `second` column to compute accelerations (and `fuel_cumsum`), or pass pre-computed derivatives directly
 - 🎯 **Column mapping** — map your own column names with keyword arguments, no renaming required
@@ -47,12 +48,22 @@ ML framework.
 uv add acropole      # or: pip install acropole
 ```
 
-The core library runs on numpy + polars + onnxruntime. To pass and receive pandas
-`DataFrame`s, install the optional `pandas` extra:
+The core library runs on numpy + narwhals + onnxruntime and pulls in **no frame
+library of its own** — it works with whichever one you already have. If you need
+one, the extras install it for you:
 
 ```bash
-uv add "acropole[pandas]"      # or: pip install "acropole[pandas]"
+uv add "acropole[polars]"      # or: [pandas], [pyarrow]
 ```
+
+The `acropole` command-line tool reads files itself, so it does need a concrete
+backend — `acropole[cli]` installs polars for that purpose:
+
+```bash
+uv add "acropole[cli]"
+```
+
+The numpy-only `AircraftFuelEstimator` needs no backend at all.
 
 To work from source, this project uses [uv](https://docs.astral.sh/uv/):
 

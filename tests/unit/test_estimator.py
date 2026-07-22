@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
 
 import numpy as np
 import pandas as pd
 import polars as pl
+import pyarrow as pa
 import pytest
 
 from acropole.estimator import (
@@ -105,10 +105,7 @@ class TestEstimateContract:
         assert out["fuel_flow"].is_finite().all()
 
     def test_second_adds_cumsum(self) -> None:
-        out = cast(
-            "pd.DataFrame",
-            FuelEstimator().estimate(_flight(second=True), second="second"),
-        )
+        out = FuelEstimator().estimate(_flight(second=True), second="second")
         assert "fuel_cumsum" in out.columns
         assert out["fuel_cumsum"].is_monotonic_increasing
 
@@ -120,7 +117,7 @@ class TestEstimateContract:
     def test_unsupported_typecode_warns_and_nans(self) -> None:
         flight = _flight(typecode="ZZZZ")
         with pytest.warns(UserWarning, match="not supported"):
-            out = cast("pd.DataFrame", FuelEstimator().estimate(flight))
+            out = FuelEstimator().estimate(flight)
         assert out["fuel_flow"].isna().all()
 
     def test_multi_typecode_uses_per_aircraft_params(self) -> None:
@@ -135,21 +132,46 @@ class TestEstimateContract:
         assert not np.allclose(ff_a, ff_b)
 
 
+class TestBackendAgnostic:
+    """Any narwhals-supported eager frame is accepted and echoed back (#narwhals).
+
+    pyarrow is the load-bearing case: it never worked while the estimator
+    converted through polars internally, so it proves the dispatch is narwhals'
+    and not a hard-coded pandas/polars pair.
+    """
+
+    def test_pyarrow_in_pyarrow_out(self) -> None:
+        table = pa.Table.from_pandas(_flight(second=True))
+        out = FuelEstimator().estimate(table)
+        assert isinstance(out, pa.Table)
+        assert {"fuel_flow", "fuel_flow_kgh", "fuel_cumsum"} <= set(out.column_names)
+
+    def test_all_backends_agree_numerically(self) -> None:
+        # The same trajectory through three backends must predict the same fuel
+        # flow: the frame library must not perturb the numerics.
+        flight = _flight(second=True)
+        fe = FuelEstimator()
+        pandas_ff = fe.estimate(flight)["fuel_flow"].to_numpy()
+        polars_ff = fe.estimate(pl.from_pandas(flight))["fuel_flow"].to_numpy()
+        arrow_ff = (
+            fe.estimate(pa.Table.from_pandas(flight)).column("fuel_flow").to_numpy()
+        )
+        np.testing.assert_allclose(polars_ff, pandas_ff, rtol=1e-12)
+        np.testing.assert_allclose(arrow_ff, pandas_ff, rtol=1e-12)
+
+
 class TestSecondPresenceTriggers:
     """A ``second`` column is detected by presence, no kwarg required (#15)."""
 
     def test_no_kwarg_present_second_adds_cumsum_pandas(self) -> None:
         # AC1: user case — second column present, no kwarg -> fuel_cumsum.
-        out = cast("pd.DataFrame", FuelEstimator().estimate(_flight(second=True)))
+        out = FuelEstimator().estimate(_flight(second=True))
         assert "fuel_cumsum" in out.columns
         assert out["fuel_cumsum"].is_monotonic_increasing
 
     def test_no_kwarg_present_second_adds_cumsum_polars(self) -> None:
         # AC1 (polars path): same presence-trigger on a polars frame.
-        out = cast(
-            "pl.DataFrame",
-            FuelEstimator().estimate(pl.from_pandas(_flight(second=True))),
-        )
+        out = FuelEstimator().estimate(pl.from_pandas(_flight(second=True)))
         assert "fuel_cumsum" in out.columns
         cumsum = out["fuel_cumsum"].to_numpy()
         assert np.all(np.diff(cumsum) >= 0)
@@ -158,10 +180,8 @@ class TestSecondPresenceTriggers:
         # AC2: presence alone must drive the real derivatives -> identical
         # fuel_flow whether or not the redundant second="second" kwarg is passed.
         flight = _flight(second=True)
-        implicit = cast("pd.DataFrame", FuelEstimator().estimate(flight))
-        explicit = cast(
-            "pd.DataFrame", FuelEstimator().estimate(flight, second="second")
-        )
+        implicit = FuelEstimator().estimate(flight)
+        explicit = FuelEstimator().estimate(flight, second="second")
         np.testing.assert_array_equal(
             implicit["fuel_flow"].to_numpy(), explicit["fuel_flow"].to_numpy()
         )
@@ -169,10 +189,8 @@ class TestSecondPresenceTriggers:
     def test_fuel_flow_parity_with_and_without_kwarg_polars(self) -> None:
         # AC2 (polars path): same parity on a polars frame.
         flight = pl.from_pandas(_flight(second=True))
-        implicit = cast("pl.DataFrame", FuelEstimator().estimate(flight))
-        explicit = cast(
-            "pl.DataFrame", FuelEstimator().estimate(flight, second="second")
-        )
+        implicit = FuelEstimator().estimate(flight)
+        explicit = FuelEstimator().estimate(flight, second="second")
         np.testing.assert_array_equal(
             implicit["fuel_flow"].to_numpy(), explicit["fuel_flow"].to_numpy()
         )
@@ -180,12 +198,8 @@ class TestSecondPresenceTriggers:
     def test_present_second_uses_real_derivatives_not_quasi_steady(self) -> None:
         # AC2: a present second column must change the prediction vs the
         # no-second quasi-steady fallback (proves derivatives actually flow in).
-        with_second = cast(
-            "pd.DataFrame", FuelEstimator().estimate(_flight(second=True))
-        )
-        without_second = cast(
-            "pd.DataFrame", FuelEstimator().estimate(_flight(second=False))
-        )
+        with_second = FuelEstimator().estimate(_flight(second=True))
+        without_second = FuelEstimator().estimate(_flight(second=False))
         assert not np.allclose(
             with_second["fuel_flow"].to_numpy(),
             without_second["fuel_flow"].to_numpy(),
@@ -194,14 +208,14 @@ class TestSecondPresenceTriggers:
     def test_no_second_column_works_without_cumsum(self) -> None:
         # AC3: a frame with no second column still works -> no fuel_cumsum,
         # finite fuel_flow, no error (unchanged behavior).
-        out = cast("pd.DataFrame", FuelEstimator().estimate(_flight(second=False)))
+        out = FuelEstimator().estimate(_flight(second=False))
         assert "fuel_cumsum" not in out.columns
         assert np.isfinite(out["fuel_flow"].to_numpy()).all()
 
     def test_explicit_custom_second_column_name(self) -> None:
         # AC4: an explicit kwarg still maps a non-standard column name.
         flight = _flight(second=True).rename(columns={"second": "elapsed_s"})
-        out = cast("pd.DataFrame", FuelEstimator().estimate(flight, second="elapsed_s"))
+        out = FuelEstimator().estimate(flight, second="elapsed_s")
         assert "fuel_cumsum" in out.columns
         assert out["fuel_cumsum"].is_monotonic_increasing
 
@@ -209,7 +223,7 @@ class TestSecondPresenceTriggers:
         # AC4 (negative): a non-standard column name is NOT auto-detected; it is
         # only the default "second" name (or an explicit kwarg) that triggers.
         flight = _flight(second=True).rename(columns={"second": "elapsed_s"})
-        out = cast("pd.DataFrame", FuelEstimator().estimate(flight))
+        out = FuelEstimator().estimate(flight)
         assert "fuel_cumsum" not in out.columns
 
 
@@ -352,7 +366,7 @@ class TestExampleFlight:
     @pytest.fixture(scope="class")
     def out(self) -> pd.DataFrame:
         flight = pd.read_csv(EXAMPLE).iloc[::4].reset_index(drop=True)
-        result = cast("pd.DataFrame", FuelEstimator().estimate(flight, **MAPPING))
+        result = FuelEstimator().estimate(flight, **MAPPING)
         result["FUEL_FLOW_KGH"] = flight["FUEL_FLOW_KGH"]
         return result
 
