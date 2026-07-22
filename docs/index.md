@@ -38,15 +38,16 @@ hide:
 
 `acropole` predicts the **fuel flow of aircraft** (kg/s, kg/h and cumulative kg) from
 trajectory data — groundspeed, altitude and vertical rate — using a portable **ONNX**
-model trained on Quick Access Recorder (QAR) data. It accepts a **pandas or polars**
-`DataFrame`, dispatches per aircraft typecode, and returns the same frame enriched with
-fuel-flow columns.
+model trained on Quick Access Recorder (QAR) data. It accepts **any `DataFrame`
+[narwhals](https://narwhals-dev.github.io/narwhals/) supports** — pandas, polars,
+pyarrow and more — dispatches per aircraft typecode, and returns the same frame
+enriched with fuel-flow columns.
 
 ## Features
 
 - ⛽ **Fuel-flow prediction** — `fuel_flow` (kg/s), `fuel_flow_kgh` (kg/h), `fuel_cumsum` (kg)
 - ✈️ **Multi-aircraft** — frames mixing typecodes are scored per typecode
-- 🐼 **pandas *and* polars** — same type in, same type out; polars engine internally
+- 🐼 **Bring your own DataFrame** — pandas, polars, pyarrow …; same type in, same type out, none is a hard dependency
 - 🚀 **Fast ONNX runtime** — 2–4.8× faster than the original TensorFlow model, no TF dependency
 - 📈 **Temporal derivatives** — accelerations from a `second` column, or pre-computed
 - 🎯 **Column mapping** — point each feature at your own column names
@@ -83,7 +84,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - **[Tutorials](tutorials/getting-started.md)** — learn Acropole step by step, from install to your first estimate.
 - **[How-To Guides](howto/index.md)** — task-oriented recipes: multi-aircraft frames, column mapping, derivatives.
 - **[Reference](reference/index.md)** — the Python API surface, auto-generated from the source.
-- **[Explanation](explanation/architecture.md)** — how the polars pipeline, the ONNX model and the typecode dispatch fit together.
+- **[Explanation](explanation/architecture.md)** — how the narwhals front end, the ONNX model and the typecode dispatch fit together.
 
 ---
 

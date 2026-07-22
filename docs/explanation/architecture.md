@@ -1,15 +1,16 @@
 # Architecture
 
 This page explains how Acropole turns a trajectory `DataFrame` into a fuel-flow estimate:
-the polars-internal pipeline behind a pandas-compatible API, the ONNX model, feature
+the backend-agnostic narwhals front end, the numpy compute core, the ONNX model, feature
 normalization, and the per-typecode dispatch.
 
 ## Overview
 
 ```mermaid
 graph TD
-    IN["DataFrame (pandas or polars)"] --> PL["polars frame (normalize input type)"]
-    PL --> DISP["Dispatch by typecode"]
+    IN["DataFrame (pandas, polars, pyarrow, …)"] --> NW["narwhals wrapper (no copy, no conversion)"]
+    NW --> COLS["Extract feature columns to numpy, once"]
+    COLS --> DISP["Dispatch by typecode (numpy mask)"]
     DISP --> A320["AircraftFuelEstimator(A320)"]
     DISP --> B738["AircraftFuelEstimator(B738)"]
     A320 --> FEAT["Build 12-feature matrix + min/max normalize"]
@@ -20,16 +21,26 @@ graph TD
     OUT --> RET["return same type as input"]
 ```
 
-## A polars engine behind a dual API
+## A numpy core behind a backend-agnostic API
 
-`FuelEstimator.estimate()` accepts a **pandas or a polars** `DataFrame`. Internally the
-work is always done in polars: a pandas input is converted with `pl.from_pandas`, the
-estimation runs, and the result is converted back to pandas before returning. The input
-type is therefore preserved on output — pandas in, pandas out; polars in, polars out.
+`FuelEstimator.estimate()` accepts **any eager `DataFrame` narwhals supports** — pandas,
+polars, pyarrow, and others. [narwhals](https://narwhals-dev.github.io/narwhals/) is a
+zero-dependency compatibility layer: it wraps the frame you pass in and dispatches to its
+native methods, so there is **no conversion to an intermediate frame library**. The input
+type is preserved on output — pandas in, pandas out; polars in, polars out.
 
-This keeps the hot path on a single, fast columnar engine while pandas stays an
-**optional** dependency (the `[pandas]` extra). Users who already live in polars pay no
-conversion cost.
+Consequently `acropole` depends on no frame library at all. Users bring the one they
+already have, and the `[polars]`, `[pandas]` and `[pyarrow]` extras are conveniences,
+not requirements.
+
+The narwhals layer is deliberately thin: the feature columns are pulled out to numpy
+**once**, up front, and everything after that — the per-typecode split, the derivatives,
+the feature matrix — is numpy. The frame backend therefore costs one column extraction
+per call, not per typecode group, and it never touches the hot path.
+
+The aircraft parameter table is read with the stdlib `csv` module rather than a frame
+backend, which is what lets the numpy-only `AircraftFuelEstimator` run with **no
+dataframe library installed whatsoever**.
 
 ## Dispatch by typecode
 
@@ -75,7 +86,7 @@ cast to `float32` to match the model's input dtype.
 
 Acropole originally ran a TensorFlow model. It was migrated to ONNX for two reasons:
 
-- **No heavy ML framework** — the runtime depends only on `numpy`, `polars` and
+- **No heavy ML framework** — the runtime depends only on `numpy`, `narwhals` and
   `onnxruntime`. There is no TensorFlow install, no GPU toolchain, no multi-hundred-MB
   dependency tree. The model ships as a single portable `.onnx` file inside the package.
 - **Speed** — the ONNX path is **2–4.8× faster** than the original TensorFlow inference,
@@ -88,8 +99,10 @@ reference, so existing results are reproduced to floating-point tolerance.
 
 | Decision | Rationale |
 |---|---|
-| polars engine, pandas optional | One fast columnar engine; pandas stays an extra, not a core dependency |
-| Same type in / same type out | Drop-in for both pandas and polars users, no surprise conversions |
+| narwhals front end, numpy core | Works with any frame library; none is a hard dependency, and the hot path stays numpy |
+| `narwhals.stable.v1`, not top-level | Backwards-compatibility guarantee across narwhals major versions, as recommended for libraries |
+| Same type in / same type out | Drop-in whichever frame library you use, no surprise conversions |
+| Params table via stdlib `csv` | A 30-row lookup needs no frame backend, so the numpy-only API has zero of them |
 | Per-typecode dispatch with shared session | Process a mixed fleet in one call without reloading the model |
 | ONNX over TensorFlow | Portable single-file model, no heavy framework, 2–4.8× faster, 1e-6 parity |
 | Fixed min/max normalization | Deterministic, baked-in physical ranges matching the training distribution |

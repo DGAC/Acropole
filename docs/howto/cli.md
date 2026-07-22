@@ -4,6 +4,18 @@ You don't need to write any Python to estimate fuel flow. Installing `acropole` 
 an `acropole` command that reads a flight file, estimates fuel flow, and **writes the
 enriched table back to disk**.
 
+!!! note "Install the `cli` extra"
+
+    Unlike the library, the CLI reads files itself, so it needs a dataframe backend
+    installed. `acropole[cli]` provides one (polars):
+
+    ```bash
+    uv add "acropole[cli]"      # or: pip install "acropole[cli]"
+    ```
+
+    If you already have polars, pyarrow or pandas installed, the CLI uses that instead —
+    it picks the first one it finds, in that order.
+
 For the full list of options, see the [CLI reference](../reference/cli.md).
 
 ## A simple CSV with standard column names

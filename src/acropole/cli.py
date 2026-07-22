@@ -8,12 +8,14 @@ parsing.
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import cyclopts
-import polars as pl
+import narwhals.stable.v1 as nw
+from narwhals.stable.v1.typing import IntoDataFrame
 
 from acropole import FuelEstimator
 
@@ -22,14 +24,32 @@ app = cyclopts.App(
     help="Predict aircraft fuel flow from trajectory data.",
 )
 
+# The library itself is backend-agnostic, but reading a file needs a concrete
+# one. Preference order, first installed wins; `acropole[cli]` pulls in polars.
+type BackendName = Literal["polars", "pyarrow", "pandas"]
+_BACKENDS: tuple[BackendName, ...] = ("polars", "pyarrow", "pandas")
 
-def _read(path: Path) -> pl.DataFrame:
-    """Load a flight table from .csv or .parquet, preferring polars."""
+
+def _backend() -> BackendName:
+    """The first installed frame backend, for narwhals' file readers."""
+    for name in _BACKENDS:
+        if importlib.util.find_spec(name) is not None:
+            return name
+    print(
+        "error: no dataframe backend installed "
+        "(pip install 'acropole[cli]' for polars)",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+
+
+def _read(path: Path) -> nw.DataFrame[IntoDataFrame]:
+    """Load a flight table from .csv or .parquet via any available backend."""
     suffix = path.suffix.lower()
     if suffix == ".parquet":
-        return pl.read_parquet(path)
+        return nw.read_parquet(path, backend=_backend())
     if suffix == ".csv":
-        return pl.read_csv(path)
+        return nw.read_csv(path, backend=_backend())
     print(
         f"error: unsupported input format {suffix!r} (use .csv or .parquet)",
         file=sys.stderr,
@@ -37,7 +57,7 @@ def _read(path: Path) -> pl.DataFrame:
     raise SystemExit(1)
 
 
-def _write(frame: pl.DataFrame, path: Path) -> None:
+def _write(frame: nw.DataFrame[IntoDataFrame], path: Path) -> None:
     if path.suffix.lower() == ".parquet":
         frame.write_parquet(path)
     else:
@@ -96,16 +116,13 @@ def estimate(
         mapping["second"] = second
 
     try:
-        estimated = FuelEstimator().estimate(frame, **mapping)
+        estimated = FuelEstimator().estimate(frame.to_native(), **mapping)
     except (ValueError, KeyError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
 
-    # estimate() echoes its input frame type; _read always yields polars, so the
-    # result is polars too. Narrow defensively (and convert pandas if it ever isn't).
-    result = (
-        estimated if isinstance(estimated, pl.DataFrame) else pl.from_pandas(estimated)
-    )
+    # estimate() echoes its input frame type, whichever backend _read picked.
+    result = nw.from_native(estimated, eager_only=True)
 
     if out is None:
         out = flight.with_name(f"{flight.stem}_fuel{flight.suffix}")

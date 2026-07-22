@@ -9,8 +9,9 @@ from acropole import FuelEstimator, AircraftFuelEstimator
 
 ## `FuelEstimator`
 
-The high-level, `DataFrame`-in / `DataFrame`-out estimator. Accepts a pandas **or** polars
-`DataFrame`, dispatches per aircraft typecode, and returns the same type enriched with
+The high-level, `DataFrame`-in / `DataFrame`-out estimator. Accepts **any eager
+`DataFrame` narwhals supports** (pandas, polars, pyarrow, …), dispatches per aircraft
+typecode, and returns the same type enriched with
 `fuel_flow` (kg/s), `fuel_flow_kgh` (kg/h) and — when a `second` column is given —
 `fuel_cumsum` (kg).
 
