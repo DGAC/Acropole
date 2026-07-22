@@ -46,3 +46,58 @@ jobs:
       - run: uv python install ${{ matrix.python-version }}
       - run: uv sync --all-groups
       - run: uv run pytest --cov -q
+
+  backends:
+    # The jobs above install every backend at once (the dev group), so they
+    # cannot catch a regression that makes a frame library mandatory again.
+    # Each leg here installs the package with exactly one backend — or none —
+    # which is what the [polars]/[pandas]/[pyarrow] extras actually promise.
+    name: Backend ${{ matrix.backend }} alone
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [polars, pandas, pyarrow, none]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # Required for hatch-vcs
+      - uses: astral-sh/setup-uv@v7
+      - run: uv python install 3.12
+
+      - name: Install acropole with only ${{ matrix.backend }}
+        run: |
+          uv venv
+          if [ "${{ matrix.backend }}" = "none" ]; then
+            uv pip install . pytest
+          else
+            uv pip install ".[${{ matrix.backend }}]" pytest
+          fi
+
+      # Without this, a broken extra would leave the suite skipping every
+      # backend test and the leg would still pass green.
+      - name: Assert the environment has only ${{ matrix.backend }}
+        env:
+          BACKEND: ${{ matrix.backend }}
+        run: |
+          ./.venv/bin/python - <<'PY'
+          import importlib.util, os, sys
+
+          expected = os.environ["BACKEND"]
+          want = set() if expected == "none" else {expected}
+          found = {
+              name
+              for name in ("polars", "pandas", "pyarrow")
+              if importlib.util.find_spec(name) is not None
+          }
+          if found != want:
+              sys.exit(f"expected backends {want or 'none'}, found {found or 'none'}")
+          print(f"ok: backends installed = {found or 'none'}")
+          PY
+
+      # addopts/pythonpath are overridden so pytest exercises the *installed*
+      # package rather than src/, and does not need pytest-cov in this slim env.
+      # .venv/bin/python is called directly: `uv run` would re-sync the project
+      # and reinstall every backend, defeating the point of the job.
+      - name: Run the single-backend suite
+        run: ./.venv/bin/python -m pytest tests/integration -q -o addopts="" -o pythonpath=
