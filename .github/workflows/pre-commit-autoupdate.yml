@@ -8,15 +8,16 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 jobs:
   autoupdate:
     name: Update pre-commit hooks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -24,6 +25,7 @@ jobs:
       - run: pre-commit autoupdate
 
       - uses: peter-evans/create-pull-request@v8
+        id: update
         with:
           branch: chore/pre-commit-autoupdate
           title: 'chore(deps): pre-commit autoupdate'
@@ -32,3 +34,10 @@ jobs:
             Automated pre-commit hook version bump via
             `pre-commit autoupdate`.
           delete-branch: true
+
+      # Explicit dispatch also runs CI for PRs created with GITHUB_TOKEN.
+      - name: Validate updated hooks
+        if: steps.update.outputs.pull-request-operation == 'created' || steps.update.outputs.pull-request-operation == 'updated'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ci.yml --ref chore/pre-commit-autoupdate
