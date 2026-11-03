@@ -10,7 +10,7 @@ jobs:
     name: Run Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0  # Required for hatch-vcs
       - uses: astral-sh/setup-uv@v7
@@ -33,7 +33,7 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0  # Required for hatch-vcs
       - uses: astral-sh/setup-uv@v7
