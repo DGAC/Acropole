@@ -409,8 +409,10 @@ class FuelEstimator:
         split is then a numpy mask. That keeps the backend-specific work to a
         single conversion per column instead of one frame filter per typecode.
         """
-        typecode_col = col["typecode"]
-        typecodes = df[typecode_col].to_numpy()
+        codes = df[col["typecode"]]
+        # Nullable pandas strings expose pd.NA, whose equality is not boolean.
+        typecodes = codes.to_numpy().astype(object)
+        typecodes[codes.is_null().to_numpy()] = None
         required, optional = self._extract(df, col)
 
         result = np.full(len(df), np.nan, dtype=self.dtype)

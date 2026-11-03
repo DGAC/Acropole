@@ -15,7 +15,9 @@ they all run.
 from __future__ import annotations
 
 import importlib.util
+from typing import Literal
 
+import narwhals.stable.v1 as nw
 import numpy as np
 import pytest
 
@@ -116,3 +118,86 @@ def test_pyarrow_alone() -> None:
     out = FuelEstimator().estimate(frame)
     _check(out, pa.Table)
     assert np.isfinite(out.column("fuel_flow").to_numpy()).all()
+
+
+@pytest.mark.parametrize("backend", ["pandas", "polars", "pyarrow"])
+def test_missing_typecode_backend_parity(
+    backend: Literal["pandas", "polars", "pyarrow"],
+) -> None:
+    """A missing typecode only invalidates its own row on every backend."""
+    pytest.importorskip(backend)
+    frame = nw.from_dict(
+        {
+            "typecode": ["A320", None, *TYPECODE[2:]],
+            "groundspeed": GROUNDSPEED,
+            "altitude": ALTITUDE,
+            "vertical_rate": VERTICAL_RATE,
+        },
+        backend=backend,
+    ).to_native()
+    expected = AircraftFuelEstimator("A320").estimate(
+        GROUNDSPEED, ALTITUDE, VERTICAL_RATE
+    )
+    with pytest.warns(UserWarning, match="not supported"):
+        out = nw.from_native(FuelEstimator().estimate(frame), eager_only=True)
+    actual = out["fuel_flow"].to_numpy()
+    known = np.arange(N) != 1
+    assert actual.shape == (N,)
+    assert np.isnan(actual[1])
+    np.testing.assert_allclose(actual[known], expected[known])
+
+
+@pytest.mark.parametrize("dtype", ["string", "string[pyarrow]"])
+def test_pandas_nullable_typecode(dtype: str) -> None:
+    """Nullable pandas strings must not make the numpy group mask ambiguous."""
+    pytest.importorskip("pandas")
+    if dtype == "string[pyarrow]":
+        pytest.importorskip("pyarrow")
+    import pandas as pd
+
+    frame = pd.DataFrame(
+        {
+            "typecode": pd.Series(["A320", None, *TYPECODE[2:]], dtype=dtype),
+            "groundspeed": GROUNDSPEED,
+            "altitude": ALTITUDE,
+            "vertical_rate": VERTICAL_RATE,
+        }
+    )
+    expected = AircraftFuelEstimator("A320").estimate(
+        GROUNDSPEED, ALTITUDE, VERTICAL_RATE
+    )
+    with pytest.warns(UserWarning, match="not supported"):
+        actual = FuelEstimator().estimate(frame)["fuel_flow"].to_numpy()
+    known = np.arange(N) != 1
+    assert np.isnan(actual[1])
+    np.testing.assert_allclose(actual[known], expected[known])
+
+
+@pytest.mark.parametrize("index_kind", ["offset", "duplicate", "datetime"])
+def test_pandas_index_and_input_preserved(index_kind: str) -> None:
+    """Predictions are positional while the caller retains its index and input."""
+    pytest.importorskip("pandas")
+    import pandas as pd
+
+    frame = pd.DataFrame(
+        {
+            "typecode": TYPECODE,
+            "groundspeed": GROUNDSPEED,
+            "altitude": ALTITUDE,
+            "vertical_rate": VERTICAL_RATE,
+            "second": SECOND,
+        }
+    )
+    estimator = FuelEstimator()
+    expected = estimator.estimate(frame)["fuel_flow"].to_numpy()
+    if index_kind == "offset":
+        frame.index = pd.Index(np.arange(N) + 10, name="sample")
+    elif index_kind == "duplicate":
+        frame.index = pd.Index(np.repeat(np.arange(N // 2), 2), name="sample")
+    else:
+        frame.index = pd.date_range("2026-01-01", periods=N, name="sample")
+    original = frame.copy(deep=True)
+    out = estimator.estimate(frame)
+    pd.testing.assert_index_equal(out.index, frame.index)
+    pd.testing.assert_frame_equal(frame, original)
+    np.testing.assert_array_equal(out["fuel_flow"].to_numpy(), expected)
