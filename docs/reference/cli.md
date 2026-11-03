@@ -71,7 +71,7 @@ acropole estimate examples/example_flight.csv \
 | Code | Meaning |
 |---|---|
 | `0` | Success — the enriched table was written; the command prints `wrote <n> rows with fuel columns to <out>`. |
-| `1` | Error — printed on `stderr`. Raised when the input file does not exist, the format is unsupported (not `.csv`/`.parquet`), or a mapped column is missing. |
+| `1` | Error printed on `stderr`: missing input file, unsupported format, missing mapped column, file I/O failure or missing optional format dependency. A missing Parquet engine includes an installation hint. |
 
 For a task-oriented walkthrough, see the how-to guide
 [Estimate fuel from the command line](../howto/cli.md).

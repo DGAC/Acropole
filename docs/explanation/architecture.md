@@ -28,6 +28,8 @@ polars, pyarrow, and others. [narwhals](https://narwhals-dev.github.io/narwhals/
 zero-dependency compatibility layer: it wraps the frame you pass in and dispatches to its
 native methods, so there is **no conversion to an intermediate frame library**. The input
 type is preserved on output — pandas in, pandas out; polars in, polars out.
+The CI explicitly validates pandas, Polars and PyArrow; other eager Narwhals
+backends have not been verified by this project.
 
 Consequently `acropole` depends on no frame library at all. Users bring the one they
 already have, and the `[polars]`, `[pandas]` and `[pyarrow]` extras are conveniences,
@@ -49,7 +51,10 @@ each group builds an `AircraftFuelEstimator` bound to that typecode via
 `for_aircraft()` — which **reuses the already-loaded ONNX session and the parsed
 parameters**, so adding a typecode costs only a parameter lookup, not a model reload.
 Each group's predictions are scattered back into the original row order. Rows whose
-typecode is unknown stay `NaN` and raise a warning.
+typecode is unknown or missing stay `NaN` and raise a warning. When timestamps
+are present, a single-sample typecode group also has undefined computed derivatives.
+Cumulative fuel integrates all rows in their input order and propagates unknown
+contributions to subsequent totals; it never assumes unknown consumption is zero.
 
 `AircraftFuelEstimator` is also the public fast path: bound to one typecode, it works on
 plain 1-D numpy arrays with all per-aircraft constants (engine scale, normalization

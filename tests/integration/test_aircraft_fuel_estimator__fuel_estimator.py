@@ -124,7 +124,7 @@ def test_pyarrow_alone() -> None:
 def test_missing_typecode_backend_parity(
     backend: Literal["pandas", "polars", "pyarrow"],
 ) -> None:
-    """A missing typecode only invalidates its own row on every backend."""
+    """Without timestamps, missing typecodes only invalidate their own rows."""
     pytest.importorskip(backend)
     frame = nw.from_dict(
         {
@@ -201,3 +201,35 @@ def test_pandas_index_and_input_preserved(index_kind: str) -> None:
     pd.testing.assert_index_equal(out.index, frame.index)
     pd.testing.assert_frame_equal(frame, original)
     np.testing.assert_array_equal(out["fuel_flow"].to_numpy(), expected)
+
+
+@pytest.mark.parametrize("backend", ["pandas", "polars", "pyarrow"])
+@pytest.mark.parametrize("gap", ["missing", "single-sample"])
+def test_unknown_consumption_keeps_later_totals_unknown(
+    backend: Literal["pandas", "polars", "pyarrow"], gap: str
+) -> None:
+    """A missing contribution cannot become a known cumulative fuel total."""
+    pytest.importorskip(backend)
+    codes = ["A320", None if gap == "missing" else "B738", *TYPECODE[2:]]
+    frame = nw.from_dict(
+        {
+            "typecode": codes,
+            "groundspeed": GROUNDSPEED,
+            "altitude": ALTITUDE,
+            "vertical_rate": VERTICAL_RATE,
+            "second": SECOND,
+        },
+        backend=backend,
+    ).to_native()
+    estimator = FuelEstimator()
+    if gap == "missing":
+        with pytest.warns(UserWarning, match="not supported"):
+            native_out = estimator.estimate(frame)
+    else:
+        native_out = estimator.estimate(frame)
+    out = nw.from_native(native_out, eager_only=True)
+    flow = out["fuel_flow"].to_numpy()
+    cumulative = out["fuel_cumsum"].to_numpy()
+    np.testing.assert_array_equal(np.isfinite(flow), np.arange(N) != 1)
+    assert np.isfinite(cumulative[0])
+    assert np.isnan(cumulative[1:]).all()

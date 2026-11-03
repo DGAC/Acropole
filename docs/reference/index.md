@@ -15,6 +15,14 @@ typecode, and returns the same type enriched with
 `fuel_flow` (kg/s), `fuel_flow_kgh` (kg/h) and — when a `second` column is given —
 `fuel_cumsum` (kg).
 
+The CI validates pandas, Polars and PyArrow. Other eager Narwhals backends are
+not covered by this project’s backend matrix.
+
+Missing typecodes yield unknown fuel flow with a warning. With timestamps,
+insufficient samples can also make computed derivatives unknown. Cumulative fuel
+propagates unknown contributions from the first affected row onward; see
+[Missing data and cumulative fuel](../howto/derivatives.md#missing-data-and-cumulative-fuel).
+
 - `estimate(flight, **col_mapping)` — score a frame; map column names with keyword
   arguments (see [Map your own columns](../howto/columns-mapping.md)).
 - `for_aircraft(typecode)` — return an `AircraftFuelEstimator` bound to a typecode,

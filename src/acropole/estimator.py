@@ -356,6 +356,13 @@ class FuelEstimator:
         feature: ``typecode``, ``groundspeed``, ``altitude``, ``vertical_rate``,
         ``airspeed``, ``mass``, ``second``, ``d_altitude``, ``d_groundspeed``,
         ``d_airspeed``.
+
+        Missing or unsupported typecodes warn and produce NaN fuel flow. With
+        ``second``, derivatives are computed within each typecode group; a
+        single-sample group has undefined derivatives unless supplied explicitly.
+        ``fuel_cumsum`` integrates the entire frame in its existing row order.
+        An unknown fuel contribution makes that and all subsequent totals NaN;
+        missing consumption is never silently treated as zero.
         """
         df = nw.from_native(flight, eager_only=True)
 

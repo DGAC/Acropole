@@ -28,8 +28,21 @@ This path is the only one that also emits the `fuel_cumsum` column — emitted w
 
 !!! note "Duplicate timestamps"
     Where two consecutive samples share a timestamp (`Δt == 0`), the derivative is set to
-    `NaN` rather than `inf`, so a bad sample is visibly missing instead of silently
-    poisoning the cumulative sum.
+    `NaN` rather than `inf`, making the undefined derivative visible. If this
+    produces an unknown fuel contribution, the cumulative fuel stays unknown from
+    that row onward.
+
+## Missing data and cumulative fuel
+
+With `second`, derivatives are computed within each aircraft typecode group. A group
+with only one sample has no time difference: its computed derivatives are `NaN`.
+Explicitly supplied derivatives can replace those undefined derivatives.
+
+Missing or unsupported typecodes emit a warning and yield `NaN` fuel flow. The
+`fuel_cumsum` column integrates the frame in its existing row order. Once a fuel
+contribution is unknown, its cumulative total and all subsequent totals are `NaN`.
+The estimator preserves that uncertainty instead of assuming zero consumption.
+Estimate individual trajectories separately when you need separate flight totals.
 
 ## Option B — no `second`, no derivatives
 

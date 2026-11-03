@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import csv
+import importlib.util
+import math
 import subprocess
 import sys
 from pathlib import Path
@@ -9,6 +12,15 @@ from pathlib import Path
 import pytest
 
 EXAMPLE = Path(__file__).resolve().parents[2] / "examples" / "example_flight.csv"
+FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
+_HAS_BACKEND = any(
+    importlib.util.find_spec(name) is not None
+    for name in ("polars", "pyarrow", "pandas")
+)
+_HAS_PARQUET = any(
+    importlib.util.find_spec(name) is not None
+    for name in ("polars", "pyarrow", "fastparquet")
+)
 
 QAR_FLAGS = [
     "--typecode",
@@ -46,6 +58,7 @@ def test_help_lists_estimate() -> None:
 
 @pytest.mark.e2e
 @pytest.mark.skipif(not EXAMPLE.exists(), reason="example_flight.csv not packaged")
+@pytest.mark.skipif(not _HAS_BACKEND, reason="needs a frame backend")
 def test_estimate_writes_default_output(tmp_path: Path) -> None:
     # copy the example into tmp so the default <flight>_fuel.csv lands there
     flight = tmp_path / "flight.csv"
@@ -61,6 +74,7 @@ def test_estimate_writes_default_output(tmp_path: Path) -> None:
 
 @pytest.mark.e2e
 @pytest.mark.skipif(not EXAMPLE.exists(), reason="example_flight.csv not packaged")
+@pytest.mark.skipif(not _HAS_BACKEND, reason="needs a frame backend")
 def test_estimate_writes_explicit_output(tmp_path: Path) -> None:
     out = tmp_path / "result.csv"
     result = _run("estimate", str(EXAMPLE), *QAR_FLAGS, "--out", str(out))
@@ -79,9 +93,62 @@ def test_missing_file_errors() -> None:
 
 @pytest.mark.e2e
 @pytest.mark.skipif(not EXAMPLE.exists(), reason="example_flight.csv not packaged")
+@pytest.mark.skipif(not _HAS_BACKEND, reason="needs a frame backend")
 def test_missing_column_errors() -> None:
     # the file exists but its QAR columns don't match the default names
     result = _run("estimate", str(EXAMPLE))
     assert result.returncode == 1
     assert "Column" in result.stderr
     assert "not found" in result.stderr
+
+
+def _assert_csv_output(path: Path) -> None:
+    with path.open(newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    with (FIXTURES / "flight.csv").open(newline="") as handle:
+        expected_rows = list(csv.DictReader(handle))
+    assert rows
+    for row, expected in zip(rows, expected_rows, strict=True):
+        assert row["typecode"] == expected["typecode"]
+        for name in ("groundspeed", "altitude", "vertical_rate", "second"):
+            assert float(row[name]) == pytest.approx(float(expected[name]))
+        for name in ("fuel_flow", "fuel_flow_kgh", "fuel_cumsum"):
+            assert math.isfinite(float(row[name]))
+
+
+@pytest.mark.e2e
+@pytest.mark.skipif(not _HAS_BACKEND, reason="needs a frame backend")
+@pytest.mark.parametrize("direction", ["read", "write"])
+def test_parquet_dependency_or_round_trip(tmp_path: Path, direction: str) -> None:
+    """CSV and Parquet interoperate, or explain the missing optional engine."""
+    source = FIXTURES / ("flight.parquet" if direction == "read" else "flight.csv")
+    output = tmp_path / ("result.csv" if direction == "read" else "result.parquet")
+    result = _run("estimate", str(source), "--out", str(output))
+    if not _HAS_PARQUET:
+        assert result.returncode == 1
+        assert "Parquet" in result.stderr
+        assert "acropole[cli]" in result.stderr
+        assert "pyarrow" in result.stderr
+        assert "Traceback" not in result.stderr
+        assert not output.exists()
+        return
+    assert result.returncode == 0, result.stderr
+    if direction == "write":
+        restored = tmp_path / "restored.csv"
+        result = _run("estimate", str(output), "--out", str(restored))
+        assert result.returncode == 0, result.stderr
+        _assert_csv_output(restored)
+    else:
+        _assert_csv_output(output)
+
+
+@pytest.mark.e2e
+@pytest.mark.skipif(_HAS_BACKEND, reason="only exercises the backend-free install")
+def test_no_backend_errors(tmp_path: Path) -> None:
+    output = tmp_path / "result.csv"
+    result = _run("estimate", str(FIXTURES / "flight.csv"), "--out", str(output))
+    assert result.returncode == 1
+    assert "no dataframe backend installed" in result.stderr
+    assert "acropole[cli]" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert not output.exists()

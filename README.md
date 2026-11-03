@@ -26,6 +26,7 @@ model trained on Quick Access Recorder (QAR) data. It accepts **any DataFrame
 pyarrow and more — dispatches per aircraft typecode, and returns the same frame
 enriched with fuel-flow columns. The runtime depends only on numpy + narwhals +
 onnxruntime — no heavy ML framework, and no frame library of its own.
+The CI validates pandas, Polars and PyArrow; other eager Narwhals backends are unverified.
 
 📖 **[Full documentation](https://DGAC.github.io/Acropole/)**
 

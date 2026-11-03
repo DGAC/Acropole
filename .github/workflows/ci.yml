@@ -103,5 +103,5 @@ jobs:
       # package rather than src/, and does not need pytest-cov in this slim env.
       # .venv/bin/python is called directly: `uv run` would re-sync the project
       # and reinstall every backend, defeating the point of the job.
-      - name: Run the single-backend suite
-        run: ./.venv/bin/python -m pytest tests/integration -q -o addopts="" -o pythonpath=
+      - name: Run the single-backend API and CLI suites
+        run: ./.venv/bin/python -m pytest tests/integration tests/e2e -q -o addopts="" -o pythonpath=

@@ -16,6 +16,12 @@ enriched table back to disk**.
     If you already have polars, pyarrow or pandas installed, the CLI uses that instead —
     it picks the first one it finds, in that order.
 
+    pandas alone supports CSV. Reading or writing Parquet with pandas also needs
+    `pyarrow` or `fastparquet`, installed separately. For CSV and Parquet support
+    together, install `acropole[cli]`; to keep pandas as your backend, install a
+    Parquet engine such as `pyarrow`. Missing file-format dependencies produce an
+    error on `stderr`, an installation hint, and exit status `1`.
+
 For the full list of options, see the [CLI reference](../reference/cli.md).
 
 ## A simple CSV with standard column names
@@ -83,5 +89,6 @@ done
 
 !!! note "Errors stop the run"
     If a file is missing, has an unsupported format, or lacks a mapped column, the command
-    prints the error to `stderr` and exits with status `1`. In a loop, add `|| continue`
+    prints the error to `stderr` and exits with status `1`. Missing optional file-format
+    dependencies are handled the same way. In a loop, add `|| continue`
     after the command to skip a bad file and keep going.

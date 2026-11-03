@@ -103,7 +103,6 @@ def estimate(
         print(f"error: file not found: {flight}", file=sys.stderr)
         raise SystemExit(1)
 
-    frame = _read(flight)
     mapping = {
         "typecode": typecode,
         "groundspeed": groundspeed,
@@ -115,18 +114,26 @@ def estimate(
     if second is not None:
         mapping["second"] = second
 
-    try:
-        estimated = FuelEstimator().estimate(frame.to_native(), **mapping)
-    except (ValueError, KeyError) as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        raise SystemExit(1) from exc
-
-    # estimate() echoes its input frame type, whichever backend _read picked.
-    result = nw.from_native(estimated, eager_only=True)
-
     if out is None:
         out = flight.with_name(f"{flight.stem}_fuel{flight.suffix}")
-    _write(result, out)
+    try:
+        frame = _read(flight)
+        estimated = FuelEstimator().estimate(frame.to_native(), **mapping)
+        result = nw.from_native(estimated, eager_only=True)
+        _write(result, out)
+    except ImportError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        if flight.suffix.lower() == ".parquet" or out.suffix.lower() == ".parquet":
+            print(
+                "hint: Parquet support requires a backend or optional engine. "
+                "Install 'acropole[cli]' for Polars, or 'pyarrow' / "
+                "'fastparquet' for pandas.",
+                file=sys.stderr,
+            )
+        raise SystemExit(1) from exc
+    except (ValueError, KeyError, OSError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
     print(f"wrote {len(result)} rows with fuel columns to {out}")
 
 
