@@ -1,18 +1,22 @@
 repos:
-  # Ruff - linting and formatting
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.17.3
-    hooks:
-      - id: ruff
-        args: [--fix]
-      - id: ruff-format
-
-  # MyPy - type checking (local hook uses project venv via uv)
+  # Use the locked project tools for the same versions locally and in CI.
   - repo: local
     hooks:
+      - id: ruff
+        name: ruff
+        entry: uv run --locked ruff check --fix
+        language: system
+        types_or: [python, pyi, jupyter]
+        require_serial: true
+      - id: ruff-format
+        name: ruff-format
+        entry: uv run --locked ruff format
+        language: system
+        types_or: [python, pyi, jupyter]
+        require_serial: true
       - id: mypy
         name: mypy
-        entry: uv run mypy --config-file pyproject.toml
+        entry: uv run --locked mypy --config-file pyproject.toml
         language: system
         types: [python]
         pass_filenames: false
