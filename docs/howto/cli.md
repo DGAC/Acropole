@@ -18,8 +18,9 @@ enriched table back to disk**.
 
     pandas alone supports CSV. Reading or writing Parquet with pandas also needs
     `pyarrow` or `fastparquet`, installed separately. For CSV and Parquet support
-    together, install `acropole[cli]`; to keep pandas as your backend, install a
-    Parquet engine such as `pyarrow`. Missing file-format dependencies produce an
+    together, install `acropole[cli]`. Adding `pyarrow` to a pandas-only installation
+    also enables Parquet and makes the CLI select PyArrow ahead of pandas.
+    Missing file-format dependencies produce an
     error on `stderr`, an installation hint, and exit status `1`.
 
 For the full list of options, see the [CLI reference](../reference/cli.md).
