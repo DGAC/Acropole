@@ -1,0 +1,18 @@
+{
+  "score": 97,
+  "grade": "A",
+  "context": "standalone",
+  "workspace_root": null,
+  "excluded_checks": [],
+  "passed_count": 40,
+  "failures": [
+    {
+      "name": "deps.dev_deps",
+      "message": "Dev group missing 1 dep(s)",
+      "details": [
+        "Missing: pytest-xdist"
+      ],
+      "fix": "Add pytest-xdist to [dependency-groups] dev."
+    }
+  ]
+}

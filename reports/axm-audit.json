@@ -1,0 +1,97 @@
+{
+  "score": 98.9,
+  "grade": "A",
+  "passed": [
+    "ARCH_CIRCULAR: 0 circular import(s) found",
+    "ARCH_GOD_CLASS: 0 god class(es) found",
+    "ARCH_COUPLING: Coupling: 0 modules above threshold (max fan-out: 9)",
+    "ARCH_DUPLICATION: 0 duplicate block(s) found",
+    "QUALITY_COMPLEXITY: Complexity score: 100/100 (0 high-complexity functions)",
+    "QUALITY_TESTS: Test coverage: 98% (98/100)",
+    "QUALITY_DEAD_CODE: No dead code detected.",
+    "QUALITY_LINT: Lint score: 100/100 (0 issues)",
+    "QUALITY_FORMAT: Format score: 100/100 (0 unformatted)",
+    "QUALITY_DIFF_SIZE: No uncommitted changes",
+    "DEPS_AUDIT: No known vulnerabilities",
+    "DEPS_HYGIENE: 1 dependency issue(s) found",
+    "QUALITY_TYPE: Type score: 100/100 (0 errors)",
+    "PRACTICE_TEST_MIRROR: All source modules have test files",
+    "PRACTICE_TEST_SCENARIO_NAMING: No anti-mirror naming violations",
+    "PRACTICE_BARE_EXCEPT: 0 bare except(s) found",
+    "PRACTICE_BLOCKING_IO: 0 blocking-IO violation(s) found",
+    {
+      "rule_id": "PRACTICE_DOCSTRING",
+      "message": "Docstring coverage: 89% (8/9)",
+      "text": "     \u2022 acropole/cli.py: main",
+      "fix_hint": "Add docstrings to public functions"
+    },
+    "PRACTICE_ENV_CREDENTIAL_READ: 0 credential environment read(s) found",
+    {
+      "rule_id": "PRACTICE_TOOL_SECRET_LOCATION",
+      "message": "0 tool secret location(s) found",
+      "details": {
+        "findings": []
+      },
+      "metadata": {
+        "findings": []
+      }
+    },
+    {
+      "rule_id": "TEST_QUALITY_DUPLICATE_TESTS",
+      "message": "1 cluster(s), 0 clustered pair(s)",
+      "metadata": {
+        "clusters": [
+          {
+            "signal": "ambiguous_call_multiplicity",
+            "reason": "call-multiplicity rescue for SUT np.allclose(2)",
+            "similarity": 0.0,
+            "members": [
+              {
+                "file": "tests/unit/test_estimator.py",
+                "name": "test_multi_typecode_uses_per_aircraft_params",
+                "line": 123
+              },
+              {
+                "file": "tests/unit/test_estimator.py",
+                "name": "test_present_second_uses_real_derivatives_not_quasi_steady",
+                "line": 198
+              }
+            ],
+            "cluster_hash": "f5762ffceacb"
+          }
+        ],
+        "bucket_counts": {
+          "CLUSTERED": 0,
+          "AMBIGUOUS": 2,
+          "UNIQUE": 52
+        },
+        "stale_acknowledged": []
+      }
+    },
+    "TEST_QUALITY_FILE_NAMING: every integration/e2e file matches its canonical tuple",
+    "TEST_QUALITY_NO_PACKAGE_SYMBOL: every integration/e2e test exercises the package",
+    "TEST_QUALITY_PRIVATE_IMPORTS: No private imports in tests/ (see docs/test_quality.md#private-imports)",
+    {
+      "rule_id": "TEST_QUALITY_TAUTOLOGY",
+      "message": "no tautologies found",
+      "metadata": {
+        "verdicts": []
+      }
+    },
+    "QUALITY_SECURITY: Security score: 100/100 (0 high, 0 medium severity issues)",
+    "PRACTICE_SECURITY: 0 potential secret(s) found",
+    "STRUCTURE_TESTS_PYRAMID: pyramid layout ok: unit, integration, e2e",
+    "STRUCTURE_PYPROJECT: pyproject.toml completeness: 9/9 fields",
+    "TOOL_RUFF: ruff found",
+    "TOOL_MYPY: mypy found",
+    "TOOL_UV: uv found"
+  ],
+  "failed": [
+    {
+      "rule_id": "TEST_QUALITY_PYRAMID_LEVEL",
+      "message": "10 test(s) mis-located vs. classified pyramid level",
+      "text": "\u2022 tests/integration/test_aircraft_fuel_estimator__fuel_estimator.py:test_numpy_only_api_needs_no_backend integration\u2192unit (public API import, no real I/O (pure function unit test))\n\u2022 tests/integration/test_aircraft_fuel_estimator__fuel_estimator.py:test_polars_alone integration\u2192unit (public API import, no real I/O (pure function unit test))\n\u2022 tests/integration/test_aircraft_fuel_estimator__fuel_estimator.py:test_pandas_alone integration\u2192unit (public API import, no real I/O (pure function unit test))\n\u2022 tests/integration/test_aircraft_fuel_estimator__fuel_estimator.py:test_pyarrow_alone integration\u2192unit (public API import, no real I/O (pure function unit test))\n\u2022 tests/integration/test_aircraft_fuel_estimator__fuel_estimator.py:test_missing_typecode_backend_parity integration\u2192unit (public API import, no real I/O (pure function unit test))\n\u2022 tests/integration/test_aircraft_fuel_estimator__fuel_estimator.py:test_pandas_nullable_typecode integration\u2192unit (public API import, no real I/O (pure function unit test))\n\u2022 tests/integration/test_aircraft_fuel_estimator__fuel_estimator.py:test_pandas_index_and_input_preserved integration\u2192unit (public API import, no real I/O (pure function unit test))\n\u2022 tests/integration/test_aircraft_fuel_estimator__fuel_estimator.py:test_unknown_consumption_keeps_later_totals_unknown integration\u2192unit (public API import, no real I/O (pure function unit test))\n\u2022 tests/unit/test_estimator.py:test_explicit_custom_second_column_name unit\u2192integration (real I/O + public import (integration)) signals: attr:.rename()\n\u2022 tests/unit/test_estimator.py:test_custom_named_second_column_without_kwarg_is_ignored unit\u2192integration (real I/O + public import (integration)) signals: attr:.rename()",
+      "fix_hint": "Move tests to matching pyramid dir (use /pyramid-relocate)"
+    }
+  ]
+}
