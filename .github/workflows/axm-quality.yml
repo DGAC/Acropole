@@ -3,9 +3,23 @@ name: axm-quality
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: axm-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AXM_VERSION: "0.10.0"
+  AXM_AUDIT_VERSION: "0.13.0"
+  AXM_INIT_VERSION: "0.18.0"
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   quality:
@@ -17,83 +31,84 @@ jobs:
           fetch-depth: 0
       - uses: astral-sh/setup-uv@v7
       - run: uv python install 3.12
-      - run: uv sync --all-groups
+      - run: uv sync --all-groups --locked
+      - run: echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
-      # ── Badge helpers ──────────────────────────────────────────────
-      - name: Define badge helpers
-        id: helpers
+      - name: Validate badge helpers
+        run: bash .github/scripts/test_badge_helpers.sh
+
+      - name: Fetch optional badge logo
         run: |
-          cat > /tmp/badge-helpers.sh << 'HELPERS'
-          score_color() {
-            local SCORE=$1
-            if [ "$SCORE" -ge 95 ]; then echo "brightgreen"
-            elif [ "$SCORE" -ge 80 ]; then echo "green"
-            elif [ "$SCORE" -ge 60 ]; then echo "yellow"
-            else echo "red"; fi
-          }
-
-          write_badge() {
-            local DIR=$1 NAME=$2 LABEL=$3 VALUE=$4 LOGO_FILE=${5:-}
-            mkdir -p "$DIR"
-            local SCORE_INT=$(python3 -c "print(int(float('${VALUE}')))")
-            local COLOR=$(score_color "$SCORE_INT")
-            # Inline the logo only when the SVG was fetched and is non-empty;
-            # an empty logoSvg makes shields.io reject the badge.
-            if [ -n "$LOGO_FILE" ] && [ -s "$LOGO_FILE" ]; then
-              jq -n --arg l "$LABEL" --arg v "$VALUE" --arg c "$COLOR" \
-                --arg logo "$(cat "$LOGO_FILE")" \
-                '{schemaVersion:1, label:$l, message:"\($v)%", color:$c, logoSvg:$logo, style:"flat"}' \
-                > "$DIR/$NAME.json"
-            else
-              jq -n --arg l "$LABEL" --arg v "$VALUE" --arg c "$COLOR" \
-                '{schemaVersion:1, label:$l, message:"\($v)%", color:$c, style:"flat"}' \
-                > "$DIR/$NAME.json"
-            fi
-          }
-          HELPERS
-
-          # Pre-fetch the AXM logo once (valid URL; one logo for both badges)
           curl -fsSL https://raw.githubusercontent.com/axm-protocols/axm-forge/main/assets/logo.svg \
-            > /tmp/axm-logo.svg || true
+            > /tmp/axm-logo.svg || rm -f /tmp/axm-logo.svg
 
-      # ── Tests with coverage ────────────────────────────────────────
       - name: Run tests with coverage
         id: coverage
         run: |
-          source /tmp/badge-helpers.sh
-          mkdir -p _publish/badges
+          source .github/scripts/badge-helpers.sh
+          mkdir -p _publish/badges _publish/reports
 
-          uv run pytest --cov --cov-report=json:coverage.json --no-cov-on-fail -q || true
+          uv run --locked pytest --cov --cov-report=json:_publish/reports/coverage.json --no-cov-on-fail -q
 
-          COV=$(jq '.totals.percent_covered_display' coverage.json | tr -d '"')
-          echo "coverage=$COV" >> "$GITHUB_OUTPUT"
+          COV=$(jq -er '.totals.percent_covered_display' _publish/reports/coverage.json)
           write_badge "_publish/badges" "coverage" "coverage" "$COV"
-          echo "📊 Coverage: ${COV}%"
+          echo "coverage=$COV" >> "$GITHUB_OUTPUT"
+          echo "Coverage: ${COV}%"
 
-      # ── AXM Audit ─────────────────────────────────────────────────
       - name: Run AXM Audit
         id: audit
         run: |
-          source /tmp/badge-helpers.sh
-          RESULT=$(uvx axm-audit audit . --json) || true
-          SCORE=$(echo "$RESULT" | jq '.score')
-          echo "score=$SCORE" >> "$GITHUB_OUTPUT"
+          source .github/scripts/badge-helpers.sh
+          STATUS=0
+          RESULT=$(uvx --from "axm==$AXM_VERSION" --with "axm-audit==$AXM_AUDIT_VERSION" \
+            --with "axm-init==$AXM_INIT_VERSION" axm audit --path . --json-output) || STATUS=$?
+          # Exit 1 may mean quality findings; only a valid scored report is accepted.
+          if [ "$STATUS" -gt 1 ]; then exit "$STATUS"; fi
+          printf '%s\n' "$RESULT" > _publish/reports/axm-audit.json
+          require_valid_result "$RESULT" "_publish/badges" "axm-audit" "axm-audit"
+          SCORE=$(jq -r '.score' _publish/reports/axm-audit.json)
           write_badge "_publish/badges" "axm-audit" "axm-audit" "$SCORE" /tmp/axm-logo.svg
-          echo "📋 AXM Audit: $SCORE/100"
+          echo "score=$SCORE" >> "$GITHUB_OUTPUT"
+          echo "AXM Audit: $SCORE/100"
 
-      # ── AXM Init ──────────────────────────────────────────────────
       - name: Run AXM Init Check
         id: check
         run: |
-          source /tmp/badge-helpers.sh
-          RESULT=$(uvx axm-init check . --json) || true
-          SCORE=$(echo "$RESULT" | jq '.score')
-          echo "score=$SCORE" >> "$GITHUB_OUTPUT"
+          source .github/scripts/badge-helpers.sh
+          STATUS=0
+          RESULT=$(uvx --from "axm==$AXM_VERSION" --with "axm-audit==$AXM_AUDIT_VERSION" \
+            --with "axm-init==$AXM_INIT_VERSION" axm init_check --path . --json-output) || STATUS=$?
+          if [ "$STATUS" -gt 1 ]; then exit "$STATUS"; fi
+          printf '%s\n' "$RESULT" > _publish/reports/axm-init.json
+          require_valid_result "$RESULT" "_publish/badges" "axm-init" "axm-init"
+          SCORE=$(jq -r '.score' _publish/reports/axm-init.json)
           write_badge "_publish/badges" "axm-init" "axm-init" "$SCORE" /tmp/axm-logo.svg
-          echo "📋 AXM Init: $SCORE/100"
+          echo "score=$SCORE" >> "$GITHUB_OUTPUT"
+          echo "AXM Init: $SCORE/100"
 
-      # ── Push badges ────────────────────────────────────────────────
-      - name: Push badges to gh-pages
+      - name: Upload badges and source reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: quality-badges
+          path: _publish/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Check snapshot is still current
+        if: github.ref == 'refs/heads/main'
+        id: current
+        run: |
+          LATEST=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$LATEST" = "$GITHUB_SHA" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Skipping superseded snapshot $GITHUB_SHA (main is $LATEST)"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push badges and reports to gh-pages
+        if: steps.current.outputs.publish == 'true'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
