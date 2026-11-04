@@ -11,8 +11,9 @@ on the bundled example flight, and you will know what each output column means.
 
 ## Installation
 
-The core library runs on numpy + polars + onnxruntime. The examples below use pandas,
-so install the optional `pandas` extra:
+The core library runs on numpy + narwhals + onnxruntime and installs no frame library
+of its own — it works with whichever one you already have. The examples below use
+pandas, so install the optional `pandas` extra if you need it:
 
 ```bash
 pip install "acropole[pandas]"
@@ -58,7 +59,7 @@ print(result[["fuel_flow", "fuel_flow_kgh"]])
 ```
 
 Because the input was a pandas `DataFrame`, the output is a pandas `DataFrame` too. Pass
-a polars frame and you get a polars frame back.
+a polars or pyarrow frame and you get that same type back.
 
 ## Step 2 — Add optional features
 

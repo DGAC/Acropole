@@ -27,7 +27,8 @@ result = fe.estimate(flight)
 ## Unsupported typecodes
 
 If a typecode is not present in the bundled aircraft parameters, those rows are left as
-`NaN` in `fuel_flow` and a warning is emitted — the rest of the frame is still scored:
+`NaN` in `fuel_flow` and a warning is emitted. Missing typecodes follow the same
+policy. Without `second`, known aircraft rows are scored independently:
 
 ```python
 import warnings
@@ -46,6 +47,12 @@ with warnings.catch_warnings(record=True) as caught:
 print(result["fuel_flow"])      # second row is NaN
 print([str(w.message) for w in caught])  # "Aircraft type 'ZZZZ' not supported"
 ```
+
+With `second`, each typecode needs enough samples to derive its time-dependent
+features. A single-sample group has undefined computed derivatives. Any unknown
+fuel contribution also makes that and all subsequent `fuel_cumsum` totals unknown.
+See [Missing data and cumulative fuel](derivatives.md#missing-data-and-cumulative-fuel)
+for the complete policy.
 
 ## Sharing the session across aircraft
 

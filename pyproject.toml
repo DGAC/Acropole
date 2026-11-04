@@ -10,7 +10,9 @@ requires-python = ">=3.12"
 dynamic = ["version"]
 dependencies = [
     "numpy>=2.0",
-    "polars>=1.0",
+    # narwhals is the dataframe abstraction: the library never imports polars or
+    # pandas directly, so users bring whichever backend they already have.
+    "narwhals>=2.0",
     # onnxruntime < 1.19.2 was built against numpy 1.x and fails to import
     # under numpy 2 (_ARRAY_API not found); 1.19.2 is the first numpy-2 build.
     "onnxruntime>=1.19.2",
@@ -28,9 +30,13 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-# pyarrow is required by pl.from_pandas() to convert pandas DataFrames (always
-# for Arrow-backed columns, the pandas 3.0 default).
-pandas = ["pandas>=2.2", "pyarrow>=15"]
+# Frame backends. None is required: narwhals dispatches to whichever the caller
+# passes in, so install the one you already work with.
+polars = ["polars>=1.0"]
+pandas = ["pandas>=2.2"]
+pyarrow = ["pyarrow>=15"]
+# The CLI reads files itself, so it does need a concrete backend.
+cli = ["polars>=1.0"]
 
 [project.scripts]
 acropole = "acropole.cli:main"
@@ -44,7 +50,9 @@ Changelog = "https://github.com/DGAC/Acropole/releases"
 
 [dependency-groups]
 dev = [
+    # every backend, so the test suite can exercise all narwhals paths
     "pandas>=2.2",
+    "polars>=1.0",
     "pyarrow>=24.0.0",
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
@@ -173,16 +181,10 @@ module = ["onnxruntime.*"]
 ignore_missing_imports = true
 
 [tool.deptry]
-# pandas is an optional extra (pandas-in/pandas-out path); the lib itself runs
-# on polars. Declared so deptry doesn't flag it as a transitive misuse.
+# src/ imports no frame library directly — only narwhals — so the polars/pandas
+# extras need no per-rule ignores here.
 known_first_party = ["acropole"]
 extend_exclude = ["examples", "tests"]
-
-[tool.deptry.per_rule_ignores]
-# pandas is reachable only when the user passes a pandas DataFrame; it lives in
-# the optional [pandas] extra, not the core deps.
-DEP001 = []
-DEP004 = ["pandas"]
 
 [tool.git-cliff.changelog]
 header = """

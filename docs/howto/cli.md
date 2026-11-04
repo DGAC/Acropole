@@ -4,6 +4,25 @@ You don't need to write any Python to estimate fuel flow. Installing `acropole` 
 an `acropole` command that reads a flight file, estimates fuel flow, and **writes the
 enriched table back to disk**.
 
+!!! note "Install the `cli` extra"
+
+    Unlike the library, the CLI reads files itself, so it needs a dataframe backend
+    installed. `acropole[cli]` provides one (polars):
+
+    ```bash
+    uv add "acropole[cli]"      # or: pip install "acropole[cli]"
+    ```
+
+    If you already have polars, pyarrow or pandas installed, the CLI uses that instead —
+    it picks the first one it finds, in that order.
+
+    pandas alone supports CSV. Reading or writing Parquet with pandas also needs
+    `pyarrow` or `fastparquet`, installed separately. For CSV and Parquet support
+    together, install `acropole[cli]`. Adding `pyarrow` to a pandas-only installation
+    also enables Parquet and makes the CLI select PyArrow ahead of pandas.
+    Missing file-format dependencies produce an
+    error on `stderr`, an installation hint, and exit status `1`.
+
 For the full list of options, see the [CLI reference](../reference/cli.md).
 
 ## A simple CSV with standard column names
@@ -71,5 +90,6 @@ done
 
 !!! note "Errors stop the run"
     If a file is missing, has an unsupported format, or lacks a mapped column, the command
-    prints the error to `stderr` and exits with status `1`. In a loop, add `|| continue`
+    prints the error to `stderr` and exits with status `1`. Missing optional file-format
+    dependencies are handled the same way. In a loop, add `|| continue`
     after the command to skip a bad file and keep going.
